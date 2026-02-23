@@ -114,4 +114,3 @@ function update() {
 }
 
 console.log("Game code loaded!");
-```
