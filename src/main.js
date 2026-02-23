@@ -49,7 +49,7 @@ function create() {
     }).setOrigin(0.5);
     
     // Subtitle
-    this.add.text(400, 250, 'Test Build v0.1', {
+    this.add.text(400, 250, 'Test Build v0.2', {
         fontSize: '24px',
         color: '#ffffff'
     }).setOrigin(0.5);
