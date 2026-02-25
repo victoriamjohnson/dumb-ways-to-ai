@@ -5,19 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dumb Ways to AI</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #2c3e50;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-        }
-        #game-container {
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
+      html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          background-color: #2c3e50;
+          overflow: hidden;
+          font-family: Arial, sans-serif;
+      }
+
+      body {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+
+      #game-container {
+          width: 100vw;   /* take full viewport width */
+          height: 100vh;  /* take full viewport height */
+          /* optional: keep the drop shadow, or remove if you want edge-to-edge */
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      }
     </style>
 </head>
 <body>
