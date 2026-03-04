@@ -7,67 +7,102 @@ export default class HomeScene extends Phaser.Scene {
     super('HomeScene');
   }
 
+  preload() {
+    this.load.image('home_bg', 'assets/ui/Home_Screen.png');
+  }
+
   create() {
-    const centerX = this.scale.width / 2;
-    const centerY = this.scale.height / 2;
+    const { width, height } = this.scale;
+    const centerX = width / 2;
+    const centerY = height / 2;
 
-    this.cameras.main.setBackgroundColor('#34495e');
+    this.cameras.main.setBackgroundColor('#000814');
 
-    const { firstName, lastInitial, grade } = gameState.player;
+    // ----- BACKGROUND IMAGE -----
+    const bg = this.add.image(centerX, centerY, 'home_bg').setOrigin(0.5);
 
-    this.add.text(centerX, centerY - 220, 'ResponsibleCity AI Labs', {
+    const scaleX = width / bg.width;
+    const scaleY = height / bg.height;
+    const scale = Math.min(scaleX, scaleY);
+    bg.setScale(scale);
+
+    // ----- WELCOME TEXT IN ROBOT'S DIALOG BOX -----
+    const { firstName } = gameState.player || {};
+
+    const displayName =
+      firstName && firstName.trim() !== ''
+        ? firstName
+        : 'Developer';
+
+    // Center and width of the speech bubble area
+    const bubbleCenterX = width * 0.55;
+    const bubbleWidth   = width * 0.32;
+
+    // Left edge of the bubble (so text always starts from same place)
+    const bubbleLeft = bubbleCenterX - bubbleWidth / 2;
+
+    // Create text left-anchored inside the bubble
+    this.bubbleText = this.add.text(
+    bubbleLeft + 10,          // +10 = small left margin inside bubble
+    height * 0.505,
+    `Welcome, ${displayName}.`,
+    {
         fontSize: '32px',
-        color: '#ffffff'
-    }).setOrigin(0.5);
-
-    this.add.text(
-        centerX,
-        centerY - 170,
-        `Welcome, ${firstName} ${lastInitial}. (Grade ${grade})`,
-        {
-        fontSize: '22px',
-        color: '#ecf0f1'
-        }
-    ).setOrigin(0.5);
-
-    // Tutorial button
-    const tutorialButton = this.add.text(centerX, centerY - 40, 'Tutorial', {
-        fontSize: '28px',
-        backgroundColor: '#2980b9',
         color: '#ffffff',
-        padding: { left: 40, right: 40, top: 14, bottom: 14 }
-    })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
+        fontFamily: 'Courier, monospace',
+        align: 'left',
+        fixedWidth: bubbleWidth
+    }
+    ).setOrigin(0, 0.5);        // 0 = left-anchored, so it never shifts
 
-    tutorialButton.on('pointerover', () => {
-        tutorialButton.setStyle({ backgroundColor: '#1c5f87' });
-    });
-    tutorialButton.on('pointerout', () => {
-        tutorialButton.setStyle({ backgroundColor: '#2980b9' });
-    });
-    tutorialButton.on('pointerdown', () => {
-        this.scene.start('TutorialStoryScene');
+    // Auto-shrink if text is too wide
+    const maxWidth = width * 0.32;
+
+    while (this.bubbleText.width > maxWidth) {
+      const currentSize = parseInt(this.bubbleText.style.fontSize);
+      this.bubbleText.setFontSize(currentSize - 2);
+
+      if (currentSize <= 18) break; // don't shrink too much
+    }
+
+    // ----- INVISIBLE BUTTON: TUTORIAL -----
+    const tutorialHitArea = this.add.rectangle(
+      width * 0.705,
+      height * 0.672,
+      width * 0.285,
+      88,
+      0x000000,
+      0.0 // set to 0.2 temporarily if you want to see the box
+    ).setInteractive({ useHandCursor: true });
+
+    tutorialHitArea.on('pointerdown', () => {
+      this.scene.start('TutorialStoryScene');
     });
 
-    // Challenge button
-    const challengeButton = this.add.text(centerX, centerY + 60, 'Challenge Mode', {
-        fontSize: '28px',
-        backgroundColor: '#c0392b',
-        color: '#ffffff',
-        padding: { left: 40, right: 40, top: 14, bottom: 14 }
-    })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
+    // ----- INVISIBLE BUTTON: CHALLENGE MODE -----
+    const challengeHitArea = this.add.rectangle(
+      width * 0.705,
+      height * 0.84,
+      width * 0.355,
+      85,
+      0x000000,
+      0.0
+    ).setInteractive({ useHandCursor: true });
 
-    challengeButton.on('pointerover', () => {
-        challengeButton.setStyle({ backgroundColor: '#8e281d' });
+    challengeHitArea.on('pointerdown', () => {
+      this.scene.start('ChallengeScene');
     });
-    challengeButton.on('pointerout', () => {
-        challengeButton.setStyle({ backgroundColor: '#c0392b' });
+
+    // Optional keyboard shortcuts
+    this.input.keyboard.on('keyup-T', () => {
+      this.scene.start('TutorialStoryScene');
     });
-    challengeButton.on('pointerdown', () => {
-        this.scene.start('ChallengeScene');
+    this.input.keyboard.on('keyup-C', () => {
+      this.scene.start('ChallengeScene');
     });
+
+    // For debugging hitboxes, uncomment these:
+    // tutorialHitArea.fillAlpha = 0.2;
+    // challengeHitArea.fillAlpha = 0.2;
   }
 }
