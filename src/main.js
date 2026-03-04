@@ -8,6 +8,7 @@ import EndPledgeScene from './scenes/EndPledgeScene.js';
 import LoadingScene from './scenes/LoadingScene.js';
 import ThankYouScene from './scenes/ThankYouScene.js';
 import BonusPromptScene from './scenes/BonusPromptScene.js';
+import BonusQuestionScene from './scenes/BonusQuestionScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -36,6 +37,7 @@ const config = {
     TutorialStoryScene,
     FairnessTutorialScene,
     ChallengeScene,
+    BonusQuestionScene,
     EndPledgeScene,
     LoadingScene,
     ThankYouScene,

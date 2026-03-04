@@ -1,5 +1,4 @@
 // src/scenes/LoadingScene.js
-
 import gameState from '../gameState.js';
 
 export default class LoadingScene extends Phaser.Scene {
@@ -7,60 +6,68 @@ export default class LoadingScene extends Phaser.Scene {
     super('LoadingScene');
   }
 
+  preload() {
+    this.load.image('collecting_bg', 'assets/ui/Collecting_Data.png');
+  }
+
   create() {
+    const { width, height } = this.scale;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
     this.cameras.main.setBackgroundColor('#000814');
 
-    const centerX = this.scale.width / 2;
-    const centerY = this.scale.height / 2;
+    const bg = this.add.image(centerX, centerY, 'collecting_bg').setOrigin(0.5);
+    const s = Math.min(width / bg.width, height / bg.height);
+    bg.setScale(s);
 
-    const { firstName } = gameState.player;
+    const { firstName } = gameState.player || {};
 
-    this.add.text(centerX, centerY - 100, 'Collecting performance data…', {
-        fontSize: '24px',
-        color: '#ffffff'
-    }).setOrigin(0.5);
-
-    this.loadingText = this.add.text(centerX, centerY - 50,
-        `Collecting ${firstName || 'student'}'s performance data…`,
-        {
-        fontSize: '18px',
-        color: '#d1e8ff'
-        }
+    // Dialog text (placed around lower-mid)
+    this.add.text(
+    width * 0.74, // Moves text to the right into the black box
+    height * 0.55, // Moves text up slightly to fit the box height
+    `Great work Developer ${firstName || ''}.\nResponsibleCity is safer because of you.`,
+    {
+        fontSize: '26px', // Slightly smaller to ensure it fits the box padding
+        color: '#ffffff',
+        fontFamily: 'Courier, monospace',
+        align: 'center',
+        lineSpacing: 10, // Adds a little breathing room between lines
+        wordWrap: { width: width * 0.35 } // Narrower wrap so it doesn't bleed out of the black box
+    }
     ).setOrigin(0.5);
 
-    // Progress bar background
-    const barWidth = 400;
-    const barHeight = 30;
+    // Loading bar (not super top; above center-ish)
+    const barWidth = 500; // Fixed width for a consistent look under the title
+    const barHeight = 26;
 
-    const barBg = this.add.rectangle(centerX, centerY + 20, barWidth, barHeight, 0x111111)
-        .setStrokeStyle(2, 0xffffff);
+    // Adjusting barY to 0.25 puts it in the upper blue area
+    const barY = height * 0.25;
 
-    // Fill (left-aligned inside bar)
-    this.barFill = this.add.rectangle(
-        centerX - barWidth / 2 + 10,
-        centerY + 20,
-        0,
-        barHeight - 6,
-        0x00b894
-    ).setOrigin(0, 0.5);
+    const barBg = this.add.rectangle(centerX, barY, barWidth, barHeight, 0x000000, 0.45)
+      .setStrokeStyle(2, 0xffffff, 0.85);
 
-    this.progress = 0;
+    const fill = this.add.rectangle(centerX - barWidth / 2 + 6, barY, 0, barHeight - 8, 0xffffff, 0.9)
+      .setOrigin(0, 0.5);
+
+    let progress = 0;
 
     this.time.addEvent({
-        delay: 100,
-        loop: true,
-        callback: () => {
-        this.progress += 0.05;
-        if (this.progress >= 1) this.progress = 1;
+      delay: 100,
+      loop: true,
+      callback: () => {
+        progress += 0.04;
+        if (progress > 1) progress = 1;
 
-        this.barFill.width = (barWidth - 20) * this.progress;
+        fill.width = (barWidth - 12) * progress;
 
-        if (this.progress >= 1) {
-            this.time.delayedCall(300, () => {
+        if (progress >= 1) {
+          this.time.delayedCall(250, () => {
             this.scene.start('ThankYouScene');
-            });
+          });
         }
-        }
+      }
     });
   }
 }
