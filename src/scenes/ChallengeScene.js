@@ -62,7 +62,6 @@ export default class ChallengeScene extends Phaser.Scene {
     this.timerPosGameplay = { x: width * 0.15, y: height * 0.08 };
     this.timerPosPoints = { x: width * 0.20, y: height * 0.30 };
     
-    // Timer Text - Assigned high depth (10000) so it stays above popups
     this.timerText = this.add.text(this.timerPosGameplay.x, this.timerPosGameplay.y, '', { 
       fontSize: '26px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
     }).setOrigin(0.5).setDepth(10000);
@@ -85,6 +84,40 @@ export default class ChallengeScene extends Phaser.Scene {
       return; 
     }
     this.startChallenge();
+  }
+
+  // --- NEW: Handles when the 2-minute global clock hits zero ---
+  handleGlobalTimeout() {
+    if (this.phase === 'ended') return;
+    this.phase = 'points';
+    this.pauseGlobalTimer();
+    this.stopRoundBar();
+    this.clearRoundVisuals();
+    
+    const { width, height } = this.scale;
+    this.bg.setTexture('points_bg');
+    this.scaleToFit(this.bg);
+    this.timerText.setPosition(this.timerPosPoints.x, this.timerPosPoints.y).setText("Time Remaining: 0:00");
+
+    this.updateLocalLeaderboard();
+    const lb = this.getLocalLeaderboardTop3();
+    this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
+      fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
+    }).setOrigin(0.5);
+
+    this.add.text(width * 0.78, height * 0.14, 
+      `Top Players\n1) ${lb[0] ?? '---'}\n2) ${lb[1] ?? '---'}\n3) ${lb[2] ?? '---'}`, 
+      { fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace', align: 'left' }
+    ).setOrigin(0, 0.5);
+
+    // Large "Times Up" message
+    this.add.text(width/2, height * 0.55, "TIMES UP!", {
+      fontSize: '80px', color: '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.time.delayedCall(3000, () => {
+      this.endChallenge();
+    });
   }
 
   showBonusResultScreen(success) {
@@ -145,7 +178,7 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.time.delayedCall(3000, () => {
       hearts.forEach(h => h.destroy()); label.destroy(); pointsText.destroy(); totalText.destroy(); lbText.destroy();
-      if (this.timeRemaining <= 0) { this.endChallenge(); return; }
+      if (this.timeRemaining <= 0) { this.handleGlobalTimeout(); return; }
       if ((gameState.badges ?? 0) <= 0) { 
         if ((gameState.bonusUsed ?? 0) < 1) this.showBonusPopupOverlay(); 
         else this.endChallenge(); 
@@ -162,8 +195,7 @@ export default class ChallengeScene extends Phaser.Scene {
     const popup = this.add.image(width/2, height/2, 'bonus_popup_bg').setOrigin(0.5).setDepth(5001);
     popup.setScale(Math.min(width / popup.width, height / popup.height) * 0.95);
     
-    // Move timer to be visible inside the popup area
-    this.timerText.setPosition(width/2, height/2).setDepth(6000);
+    this.timerText.setPosition(width/2, height/2).setDepth(10000);
 
     const bZ = this.add.zone(width/2 - popup.displayWidth * 0.22, height/2 + popup.displayHeight * 0.25, popup.displayWidth * 0.32, popup.displayHeight * 0.18).setOrigin(0.5).setDepth(5003).setInteractive({ useHandCursor: true });
     const eZ = this.add.zone(width/2 + popup.displayWidth * 0.22, height/2 + popup.displayHeight * 0.25, popup.displayWidth * 0.32, popup.displayHeight * 0.18).setOrigin(0.5).setDepth(5003).setInteractive({ useHandCursor: true });
@@ -199,7 +231,19 @@ export default class ChallengeScene extends Phaser.Scene {
       this.anims.create({ key: 'bb_lose_anim', frames, frameRate: 15, repeat: 0 });
     }
   }
-  startGlobalTimerIfNeeded() { if (!this.globalTimerEvent) this.globalTimerEvent = this.time.addEvent({ delay: 1000, loop: true, callback: () => { if (!this.globalTimerPaused) { this.timeRemaining--; this.updateTimerText(); if (this.timeRemaining <= 0) this.endChallenge(); } } }); }
+  startGlobalTimerIfNeeded() { 
+    if (!this.globalTimerEvent) {
+        this.globalTimerEvent = this.time.addEvent({ 
+            delay: 1000, loop: true, callback: () => { 
+                if (!this.globalTimerPaused) { 
+                    this.timeRemaining--; 
+                    this.updateTimerText(); 
+                    if (this.timeRemaining <= 0) this.handleGlobalTimeout(); 
+                } 
+            } 
+        }); 
+    }
+  }
   pauseGlobalTimer() { this.globalTimerPaused = true; }
   resumeGlobalTimer() { this.globalTimerPaused = false; }
   updateTimerText() { const mins = Math.floor(this.timeRemaining / 60); const secs = this.timeRemaining % 60; this.timerText.setText(`Time Remaining: ${mins}:${secs.toString().padStart(2, '0')}`); }
