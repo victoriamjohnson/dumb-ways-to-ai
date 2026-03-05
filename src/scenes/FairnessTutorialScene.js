@@ -167,7 +167,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     // Count text (positioned above the grid later)
     this.countText = this.add.text(centerX, centerY, '', {
       fontSize: '22px',
-      color: '#000000',
+      color: '#ffffff',
       fontFamily: 'Courier, monospace'
     }).setOrigin(0.5);
     this.countText.setVisible(false);
