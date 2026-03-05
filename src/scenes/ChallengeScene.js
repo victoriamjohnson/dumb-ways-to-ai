@@ -70,7 +70,7 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.roundBarBg = this.add.rectangle(width/2, height - 18, width, 24, 0x000000, 0.35).setVisible(false);
     this.roundBarFill = this.add.rectangle(0, height - 18, width, 18, 0xffffff, 0.75).setOrigin(0, 0.5).setVisible(false);
-    this.overlayText = this.add.text(width/2, height * 0.28, 'BALANCE THE DATASET\nClick players\nHit ENTER when \n Boys and Girls are EVEN', { 
+    this.overlayText = this.add.text(width/2, height * 0.28, 'BALANCE THE DATASET\nClick players\nWhen Boys and Girls are EVEN\nHit ENTER', { 
       fontSize: '44px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center' 
     }).setOrigin(0.5).setVisible(false);
 
@@ -84,12 +84,11 @@ export default class ChallengeScene extends Phaser.Scene {
     this.startChallenge();
   }
 
-  // --- FINAL HUB SCREEN ---
   showFinalResults(reasonText) {
     this.phase = 'ended';
     this.pauseGlobalTimer();
     this.stopRoundBar();
-    this.clearRoundVisuals(); // This now hides countText too
+    this.clearRoundVisuals(); 
     
     const { width, height } = this.scale;
     this.bg.setTexture('points_bg');
@@ -155,8 +154,6 @@ export default class ChallengeScene extends Phaser.Scene {
     this.pointsUI.push(this.add.text(width/2, heartY + 150, 'Bonus Life Earned!', { 
       fontSize: '44px', color: '#ffd400', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
     }).setOrigin(0.5));
-
-    this.timerText.setPosition(this.timerPosPoints.x, this.timerPosPoints.y);
 
     this.time.delayedCall(3000, () => { 
         this.resetTimerToGameplayPosition(); 
@@ -318,11 +315,21 @@ export default class ChallengeScene extends Phaser.Scene {
 
   togglePlayer(player) { if (this.phase === 'play') { player.alive = !player.alive; player.sprite.setTexture(player.alive ? player.textureKey : player.deletedTextureKey); this.updateCounts(); } }
   updateCounts() { this.boyCount = this.players.filter(p => p.alive && p.type === 'boy').length; this.girlCount = this.players.filter(p => p.alive && p.type === 'girl').length; this.countText.setText(`Boys: ${this.boyCount}    Girls: ${this.girlCount}`); }
+  
+  // FIX: Force failure when time runs out
   handleRoundTimeout() { this.finishRound({ success: false }); }
-  handleRoundTrain() { const success = this.boyCount === this.girlCount && this.boyCount > 0; this.finishRound({ success }); }
+  
+  handleRoundTrain() { 
+    const success = this.boyCount === this.girlCount && this.boyCount > 0; 
+    this.finishRound({ success }); 
+  }
   
   finishRound({ success }) { 
     if (this.phase !== 'play') return; 
+    
+    // Clear the timer so it doesn't fire a timeout after manual train
+    if (this.roundTimerEvent) this.roundTimerEvent.remove(false);
+
     this.pauseGlobalTimer(); 
     this.stopRoundBar(); 
     const earned = success ? this.winPoints : this.losePoints; 
@@ -334,23 +341,29 @@ export default class ChallengeScene extends Phaser.Scene {
   showResultAnimationThenPoints({ success, earned }) { 
     this.phase = 'result_anim'; 
     this.clearRoundVisuals(); 
-    const animSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, success ? 'bb_win_1' : 'bb_lose_1').setOrigin(0.5).setDepth(9999); 
+    
+    // Select animation key based on success
+    const animKey = success ? 'bb_win_anim' : 'bb_lose_anim';
+    const firstFrame = success ? 'bb_win_1' : 'bb_lose_1';
+
+    const animSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, firstFrame).setOrigin(0.5).setDepth(9999); 
     animSprite.setScale(Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)); 
-    animSprite.play(success ? 'bb_win_anim' : 'bb_win_anim' /* Note: Use BB_LOSE if you have one */); 
-    this.time.delayedCall(this.resultAnimDurationMs, () => { animSprite.destroy(); this.showPointsScreen(earned, success); }); 
+    animSprite.play(animKey); 
+    
+    this.time.delayedCall(this.resultAnimDurationMs, () => { 
+        animSprite.destroy(); 
+        this.showPointsScreen(earned, success); 
+    }); 
   }
 
   startRoundBar(dur) { this.roundBarBg.setVisible(true); this.roundBarFill.setVisible(true).width = this.scale.width; this.roundBarTween = this.tweens.add({ targets: this.roundBarFill, width: 0, duration: dur, ease: 'Linear' }); }
   stopRoundBar() { if (this.roundBarTween) this.roundBarTween.stop(); this.roundBarBg.setVisible(false); this.roundBarFill.setVisible(false); }
 
   clearRoundVisuals() { 
-    // Clean player sprites
     this.players.forEach(p => p.sprite.destroy()); 
     this.players = []; 
-    // Clean final points UI elements
     this.pointsUI.forEach(obj => obj.destroy());
     this.pointsUI = [];
-    // Explicitly hide the boy/girl count text
     if (this.countText) this.countText.setVisible(false);
   }
 
