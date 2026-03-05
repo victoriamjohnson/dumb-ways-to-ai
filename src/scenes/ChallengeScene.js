@@ -7,12 +7,11 @@ export default class ChallengeScene extends Phaser.Scene {
     this.roundTimeLimit = 8000;
     this.winPoints = 100;
     this.losePoints = 25;
-    this.winFps = 15;
-    this.loseFps = 15;
     this.resultAnimDurationMs = 3000;
-    this.instructionsTotalMs = 3000;
-    this.instructionsSlideMs = 450;
     this.leaderboardKey = 'dwai_leaderboard_v1';
+    
+    this.players = [];
+    this.pointsUI = []; 
   }
 
   init(data) {
@@ -47,7 +46,6 @@ export default class ChallengeScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#000814');
     this.createResultAnimationsSafe();
     this.phase = 'overlay';
-    this.players = [];
     
     if (!this.resumeRun) {
       gameState.score = 0; gameState.badges = 3; gameState.bonusUsed = 0;
@@ -68,11 +66,11 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.countText = this.add.text(width/2, height/2, '', { 
       fontSize: '26px', color: '#ffffff', fontFamily: 'Courier, monospace' 
-    }).setOrigin(0.5).setVisible(false);
+    }).setOrigin(0.5).setVisible(false).setDepth(10);
 
     this.roundBarBg = this.add.rectangle(width/2, height - 18, width, 24, 0x000000, 0.35).setVisible(false);
     this.roundBarFill = this.add.rectangle(0, height - 18, width, 18, 0xffffff, 0.75).setOrigin(0, 0.5).setVisible(false);
-    this.overlayText = this.add.text(width/2, height * 0.28, 'BALANCE THE DATASET\nClick players\nHit ENTER when EVEN', { 
+    this.overlayText = this.add.text(width/2, height * 0.28, 'BALANCE THE DATASET\nClick players\nHit ENTER when \n Boys and Girls are EVEN', { 
       fontSize: '44px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center' 
     }).setOrigin(0.5).setVisible(false);
 
@@ -86,75 +84,88 @@ export default class ChallengeScene extends Phaser.Scene {
     this.startChallenge();
   }
 
-  // --- NEW: Handles when the 2-minute global clock hits zero ---
-  handleGlobalTimeout() {
-    if (this.phase === 'ended') return;
-    this.phase = 'points';
+  // --- FINAL HUB SCREEN ---
+  showFinalResults(reasonText) {
+    this.phase = 'ended';
     this.pauseGlobalTimer();
     this.stopRoundBar();
-    this.clearRoundVisuals();
+    this.clearRoundVisuals(); // This now hides countText too
     
     const { width, height } = this.scale;
     this.bg.setTexture('points_bg');
     this.scaleToFit(this.bg);
-    this.timerText.setPosition(this.timerPosPoints.x, this.timerPosPoints.y).setText("Time Remaining: 0:00");
+    
+    this.timerText.setPosition(this.timerPosPoints.x, this.timerPosPoints.y);
 
     this.updateLocalLeaderboard();
     const lb = this.getLocalLeaderboardTop3();
-    this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
+    
+    this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
       fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
-    }).setOrigin(0.5);
+    }).setOrigin(0.5));
 
-    this.add.text(width * 0.78, height * 0.14, 
+    this.pointsUI.push(this.add.text(width * 0.78, height * 0.14, 
       `Top Players\n1) ${lb[0] ?? '---'}\n2) ${lb[1] ?? '---'}\n3) ${lb[2] ?? '---'}`, 
       { fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace', align: 'left' }
-    ).setOrigin(0, 0.5);
+    ).setOrigin(0, 0.5));
 
-    // Large "Times Up" message
-    this.add.text(width/2, height * 0.55, "TIMES UP!", {
-      fontSize: '80px', color: '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold'
-    }).setOrigin(0.5);
+    const heartY = height * 0.45;
+    for (let i = 0; i < 3; i++) {
+        this.pointsUI.push(this.add.image(width/2 + (i - 1) * 180, heartY, 'heart_lost').setOrigin(0.5).setScale(0.45));
+    }
 
-    this.time.delayedCall(3000, () => {
-      this.endChallenge();
+    this.pointsUI.push(this.add.text(width/2, height * 0.65, reasonText, {
+      fontSize: '70px', color: '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold'
+    }).setOrigin(0.5));
+
+    this.time.delayedCall(4000, () => {
+      this.scene.start('EndPledgeScene');
     });
   }
 
   showBonusResultScreen(success) {
+    if (!success) {
+      this.showFinalResults("ALL LIVES LOST!");
+      return;
+    }
+
     const { width, height } = this.scale;
-    const centerX = width / 2;
     this.phase = 'points';
     this.pauseGlobalTimer();
     this.bg.setTexture('points_bg');
     this.scaleToFit(this.bg);
+    this.clearRoundVisuals(); 
     
-    this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
+    this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
       fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
-    }).setOrigin(0.5);
+    }).setOrigin(0.5));
 
     this.updateLocalLeaderboard(); 
     const lb = this.getLocalLeaderboardTop3();
-    this.add.text(width * 0.78, height * 0.14, 
+    this.pointsUI.push(this.add.text(width * 0.78, height * 0.14, 
       `Top Players\n1) ${lb[0] ?? '---'}\n2) ${lb[1] ?? '---'}\n3) ${lb[2] ?? '---'}`, 
       { fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace', align: 'left' }
-    ).setOrigin(0, 0.5);
+    ).setOrigin(0, 0.5));
 
     const heartY = height * 0.45;
     for (let i = 0; i < 3; i++) {
-      this.add.image(centerX + (i - 1) * 180, heartY, i < (gameState.badges ?? 0) ? 'heart_full' : 'heart_lost').setOrigin(0.5).setScale(0.45);
+      this.pointsUI.push(this.add.image(width/2 + (i - 1) * 180, heartY, i < (gameState.badges ?? 0) ? 'heart_full' : 'heart_lost').setOrigin(0.5).setScale(0.45));
     }
-    const msg = success ? 'Bonus Life Earned!' : 'All Lives Lost!';
-    this.add.text(centerX, heartY + 150, msg, { 
-      fontSize: '44px', color: success ? '#ffd400' : '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
-    }).setOrigin(0.5);
+    
+    this.pointsUI.push(this.add.text(width/2, heartY + 150, 'Bonus Life Earned!', { 
+      fontSize: '44px', color: '#ffd400', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
+    }).setOrigin(0.5));
 
     this.timerText.setPosition(this.timerPosPoints.x, this.timerPosPoints.y);
-    this.time.delayedCall(3000, () => { if (success) { this.resetTimerToGameplayPosition(); this.startBasketballRound(); } else { this.endChallenge(); } });
+
+    this.time.delayedCall(3000, () => { 
+        this.resetTimerToGameplayPosition(); 
+        this.startBasketballRound(); 
+    });
   }
 
   showPointsScreen(pointsEarned, success) {
     const { width, height } = this.scale;
-    const centerX = width / 2;
     this.phase = 'points';
     this.bg.setTexture('points_bg');
     this.scaleToFit(this.bg);
@@ -162,29 +173,39 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.updateLocalLeaderboard();
     const lb = this.getLocalLeaderboardTop3();
-    const totalText = this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
+    
+    this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, { 
       fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold' 
-    }).setOrigin(0.5);
-    const lbText = this.add.text(width * 0.78, height * 0.14, 
+    }).setOrigin(0.5));
+    
+    this.pointsUI.push(this.add.text(width * 0.78, height * 0.14, 
       `Top Players\n1) ${lb[0] ?? '---'}\n2) ${lb[1] ?? '---'}\n3) ${lb[2] ?? '---'}`, 
       { fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace', align: 'left' }
-    ).setOrigin(0, 0.5);
+    ).setOrigin(0, 0.5));
 
     const heartY = height * 0.45;
-    const hearts = [];
-    for (let i = 0; i < 3; i++) hearts.push(this.add.image(centerX + (i - 1) * 180, heartY, i < (gameState.badges ?? 0) ? 'heart_full' : 'heart_lost').setOrigin(0.5).setScale(0.45));
-    const label = this.add.text(centerX, heartY + 130, 'Points Earned', { fontSize: '32px', color: '#ffffff', fontFamily: 'Courier, monospace' }).setOrigin(0.5);
-    const pointsText = this.add.text(centerX, heartY + 190, `${pointsEarned}`, { fontSize: '64px', color: success ? '#228B22' : '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold' }).setOrigin(0.5);
+    for (let i = 0; i < 3; i++) {
+        this.pointsUI.push(this.add.image(width/2 + (i - 1) * 180, heartY, i < (gameState.badges ?? 0) ? 'heart_full' : 'heart_lost').setOrigin(0.5).setScale(0.45));
+    }
+    
+    this.pointsUI.push(this.add.text(width/2, heartY + 130, 'Points Earned', { fontSize: '32px', color: '#ffffff', fontFamily: 'Courier, monospace' }).setOrigin(0.5));
+    this.pointsUI.push(this.add.text(width/2, heartY + 190, `${pointsEarned}`, { fontSize: '64px', color: success ? '#228B22' : '#DC143C', fontFamily: 'Courier, monospace', fontStyle: 'bold' }).setOrigin(0.5));
 
     this.time.delayedCall(3000, () => {
-      hearts.forEach(h => h.destroy()); label.destroy(); pointsText.destroy(); totalText.destroy(); lbText.destroy();
-      if (this.timeRemaining <= 0) { this.handleGlobalTimeout(); return; }
+      if (this.timeRemaining <= 0) { 
+          this.showFinalResults("TIMES UP!"); 
+          return; 
+      }
       if ((gameState.badges ?? 0) <= 0) { 
-        if ((gameState.bonusUsed ?? 0) < 1) this.showBonusPopupOverlay(); 
-        else this.endChallenge(); 
+        if ((gameState.bonusUsed ?? 0) < 1) {
+            this.showBonusPopupOverlay(); 
+        } else { 
+            this.showFinalResults("ALL LIVES LOST!");
+        } 
         return; 
       }
-      this.resetTimerToGameplayPosition(); this.startBasketballRound();
+      this.resetTimerToGameplayPosition(); 
+      this.startBasketballRound();
     });
   }
 
@@ -204,7 +225,10 @@ export default class ChallengeScene extends Phaser.Scene {
         dim.destroy(); popup.destroy(); 
         this.scene.start('BonusQuestionScene', { returnScene: 'ChallengeScene', timeRemaining: this.timeRemaining, score: gameState.score, badges: gameState.badges }); 
     });
-    eZ.on('pointerdown', () => { this.endChallenge(); });
+    eZ.on('pointerdown', () => { 
+        dim.destroy(); popup.destroy();
+        this.showFinalResults("ALL LIVES LOST!"); 
+    });
   }
 
   updateLocalLeaderboard() {
@@ -231,6 +255,7 @@ export default class ChallengeScene extends Phaser.Scene {
       this.anims.create({ key: 'bb_lose_anim', frames, frameRate: 15, repeat: 0 });
     }
   }
+
   startGlobalTimerIfNeeded() { 
     if (!this.globalTimerEvent) {
         this.globalTimerEvent = this.time.addEvent({ 
@@ -238,37 +263,97 @@ export default class ChallengeScene extends Phaser.Scene {
                 if (!this.globalTimerPaused) { 
                     this.timeRemaining--; 
                     this.updateTimerText(); 
-                    if (this.timeRemaining <= 0) this.handleGlobalTimeout(); 
+                    if (this.timeRemaining <= 0) this.showFinalResults("TIMES UP!"); 
                 } 
             } 
         }); 
     }
   }
+
   pauseGlobalTimer() { this.globalTimerPaused = true; }
   resumeGlobalTimer() { this.globalTimerPaused = false; }
   updateTimerText() { const mins = Math.floor(this.timeRemaining / 60); const secs = this.timeRemaining % 60; this.timerText.setText(`Time Remaining: ${mins}:${secs.toString().padStart(2, '0')}`); }
+
   playInstructionsThenStartRound() {
-    const { width } = this.scale; this.pauseGlobalTimer(); this.bg.setTexture('bb_overlay_bg'); this.scaleToFit(this.bg); this.overlayText.setVisible(true).setX(-width);
-    this.tweens.add({ targets: this.overlayText, x: width/2, duration: 450, ease: 'Cubic.Out', onComplete: () => { this.time.delayedCall(2100, () => { this.tweens.add({ targets: this.overlayText, x: width * 2, duration: 450, ease: 'Cubic.In', onComplete: () => { this.overlayText.setVisible(false); this.bg.setTexture('bb_challenge_bg'); this.scaleToFit(this.bg); this.resetTimerToGameplayPosition(); this.phase = 'play'; this.startBasketballRoundCore(); } }); }); } });
+    const { width } = this.scale; 
+    this.pauseGlobalTimer(); 
+    this.bg.setTexture('bb_overlay_bg'); 
+    this.scaleToFit(this.bg); 
+    this.clearRoundVisuals(); 
+    
+    this.overlayText.setVisible(true).setX(-width);
+    this.tweens.add({ targets: this.overlayText, x: width/2, duration: 450, ease: 'Cubic.Out', onComplete: () => { 
+        this.time.delayedCall(2100, () => { 
+            this.tweens.add({ targets: this.overlayText, x: width * 2, duration: 450, ease: 'Cubic.In', onComplete: () => { 
+                this.overlayText.setVisible(false); 
+                this.bg.setTexture('bb_challenge_bg'); 
+                this.scaleToFit(this.bg); 
+                this.resetTimerToGameplayPosition(); 
+                this.phase = 'play'; 
+                this.startBasketballRoundCore(); 
+            } }); 
+        }); 
+    } });
   }
+
   startChallenge() { if (this.timeRemaining > 0) this.playInstructionsThenStartRound(); }
   startBasketballRound() { if (this.timeRemaining > 0 && this.phase !== 'ended') this.playInstructionsThenStartRound(); }
-  startBasketballRoundCore() { this.clearRoundVisuals(); this.createDatasetGrid_AlwaysMoreBoys(); this.countText.setVisible(true); this.updateCounts(); this.startRoundBar(this.roundTimeLimit); this.resumeGlobalTimer(); if (this.roundTimerEvent) this.roundTimerEvent.remove(false); this.roundTimerEvent = this.time.delayedCall(this.roundTimeLimit, () => this.handleRoundTimeout()); }
+  
+  startBasketballRoundCore() { 
+    this.clearRoundVisuals(); 
+    this.createDatasetGrid_AlwaysMoreBoys(); 
+    this.countText.setVisible(true); 
+    this.updateCounts(); 
+    this.startRoundBar(this.roundTimeLimit); 
+    this.resumeGlobalTimer(); 
+    if (this.roundTimerEvent) this.roundTimerEvent.remove(false); 
+    this.roundTimerEvent = this.time.delayedCall(this.roundTimeLimit, () => this.handleRoundTimeout()); 
+  }
+
   createDatasetGrid_AlwaysMoreBoys() {
     const { width, height } = this.scale; const centerX = width / 2; const centerY = height / 2; const cols = 4; const rows = 3; const playerScale = 0.55; const spriteSize = 256; const displaySize = spriteSize * playerScale; const colSpacing = displaySize + 55; const rowSpacing = displaySize + 45; const gridWidth = (cols - 1) * colSpacing; const gridHeight = (rows - 1) * rowSpacing; const startX = centerX - gridWidth / 2; const startY = centerY - gridHeight / 2 + height * 0.06;
     this.countText.setPosition(centerX, startY - 100); const total = 12; const numGirls = Phaser.Math.Between(1, 5); const numBoys = total - numGirls; const types = []; for (let i = 0; i < numBoys; i++) types.push('boy'); for (let i = 0; i < numGirls; i++) types.push('girl'); Phaser.Utils.Array.Shuffle(types);
     for (let i = 0; i < total; i++) { const row = Math.floor(i / cols); const col = i % cols; const x = startX + col * colSpacing; const y = startY + row * rowSpacing; const type = types[i]; const textureKey = type === 'boy' ? 'player_boy' : 'player_girl'; const deletedTextureKey = type === 'boy' ? 'player_boy_deleted' : 'player_girl_deleted'; const sprite = this.add.image(x, y, textureKey).setOrigin(0.5).setScale(playerScale).setInteractive({ useHandCursor: true }); const player = { sprite, type, alive: true, textureKey, deletedTextureKey }; sprite.on('pointerdown', () => this.togglePlayer(player)); this.players.push(player); }
   }
+
   togglePlayer(player) { if (this.phase === 'play') { player.alive = !player.alive; player.sprite.setTexture(player.alive ? player.textureKey : player.deletedTextureKey); this.updateCounts(); } }
   updateCounts() { this.boyCount = this.players.filter(p => p.alive && p.type === 'boy').length; this.girlCount = this.players.filter(p => p.alive && p.type === 'girl').length; this.countText.setText(`Boys: ${this.boyCount}    Girls: ${this.girlCount}`); }
   handleRoundTimeout() { this.finishRound({ success: false }); }
   handleRoundTrain() { const success = this.boyCount === this.girlCount && this.boyCount > 0; this.finishRound({ success }); }
-  finishRound({ success }) { if (this.phase !== 'play') return; this.pauseGlobalTimer(); this.stopRoundBar(); const earned = success ? this.winPoints : this.losePoints; gameState.score += earned; if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1); this.showResultAnimationThenPoints({ success, earned }); }
-  showResultAnimationThenPoints({ success, earned }) { this.phase = 'result_anim'; this.clearRoundVisuals(); this.countText.setVisible(false); const animSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, success ? 'bb_win_1' : 'bb_lose_1').setOrigin(0.5).setDepth(9999); animSprite.setScale(Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)); animSprite.play(success ? 'bb_win_anim' : 'bb_lose_anim'); this.time.delayedCall(this.resultAnimDurationMs, () => { animSprite.destroy(); this.showPointsScreen(earned, success); }); }
+  
+  finishRound({ success }) { 
+    if (this.phase !== 'play') return; 
+    this.pauseGlobalTimer(); 
+    this.stopRoundBar(); 
+    const earned = success ? this.winPoints : this.losePoints; 
+    gameState.score += earned; 
+    if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1); 
+    this.showResultAnimationThenPoints({ success, earned }); 
+  }
+
+  showResultAnimationThenPoints({ success, earned }) { 
+    this.phase = 'result_anim'; 
+    this.clearRoundVisuals(); 
+    const animSprite = this.add.sprite(this.scale.width / 2, this.scale.height / 2, success ? 'bb_win_1' : 'bb_lose_1').setOrigin(0.5).setDepth(9999); 
+    animSprite.setScale(Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)); 
+    animSprite.play(success ? 'bb_win_anim' : 'bb_win_anim' /* Note: Use BB_LOSE if you have one */); 
+    this.time.delayedCall(this.resultAnimDurationMs, () => { animSprite.destroy(); this.showPointsScreen(earned, success); }); 
+  }
+
   startRoundBar(dur) { this.roundBarBg.setVisible(true); this.roundBarFill.setVisible(true).width = this.scale.width; this.roundBarTween = this.tweens.add({ targets: this.roundBarFill, width: 0, duration: dur, ease: 'Linear' }); }
   stopRoundBar() { if (this.roundBarTween) this.roundBarTween.stop(); this.roundBarBg.setVisible(false); this.roundBarFill.setVisible(false); }
-  endChallenge() { this.phase = 'ended'; this.pauseGlobalTimer(); this.scene.start('EndPledgeScene'); }
-  clearRoundVisuals() { this.players.forEach(p => p.sprite.destroy()); this.players = []; }
+
+  clearRoundVisuals() { 
+    // Clean player sprites
+    this.players.forEach(p => p.sprite.destroy()); 
+    this.players = []; 
+    // Clean final points UI elements
+    this.pointsUI.forEach(obj => obj.destroy());
+    this.pointsUI = [];
+    // Explicitly hide the boy/girl count text
+    if (this.countText) this.countText.setVisible(false);
+  }
+
   scaleToFit(img) { img.setScale(Math.min(this.scale.width / img.width, this.scale.height / img.height)); }
   resetTimerToGameplayPosition() { this.timerText.setPosition(this.timerPosGameplay.x, this.timerPosGameplay.y); }
   update() { if (this.phase === 'play' && Phaser.Input.Keyboard.JustDown(this.enterKey)) this.handleRoundTrain(); }
