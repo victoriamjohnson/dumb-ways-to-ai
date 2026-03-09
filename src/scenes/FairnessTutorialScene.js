@@ -235,7 +235,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     } else if (this.phase === 'reflection') {
       this.currentIndex++;
       if (this.currentIndex >= this.reflectionSteps.length) {
-        this.scene.start('HomeScene');
+        this.scene.start('TransparencyTutorialScene');
       } else {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);

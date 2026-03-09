@@ -53,11 +53,11 @@ export default class BonusQuestionScene extends Phaser.Scene {
     };
     
     this.options = {
-      A: this.add.text(boxLeft + 30, boxTop + 50,  'A) Fairness', style),
+      A: this.add.text(boxLeft + 30, boxTop + 50,  'A) Friendly', style),
       B: this.add.text(boxLeft + 30, boxTop + 85,  'B) Transparency', style),
       C: this.add.text(boxLeft + 30, boxTop + 120, 'C) Privacy', style),
       D: this.add.text(boxLeft + 30, boxTop + 155, 'D) Accountability', style),
-      E: this.add.text(boxLeft + 30, boxTop + 190, 'E) Friendly', style)
+      E: this.add.text(boxLeft + 30, boxTop + 190, 'E) Fairness', style)
     };
 
     this.hintText = this.add.text(centerX, height * 0.92, 'Press A–E to choose, then press ENTER to submit.', {
