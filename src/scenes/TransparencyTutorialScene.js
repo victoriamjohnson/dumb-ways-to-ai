@@ -202,7 +202,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       if (this.currentIndex >= this.reflectionSteps.length) {
         // Tutorial complete — move to next tutorial
         // Change this to 'AccountabilityTutorialScene' once it's built
-        this.scene.start('HomeScene');
+        this.scene.start('AccountabilityTutorialScene');
       } else {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);

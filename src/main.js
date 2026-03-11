@@ -10,6 +10,7 @@ import ThankYouScene from './scenes/ThankYouScene.js';
 import BonusPromptScene from './scenes/BonusPromptScene.js';
 import BonusQuestionScene from './scenes/BonusQuestionScene.js';
 import TransparencyTutorialScene from './scenes/TransparencyTutorialScene.js';
+import AccountabilityTutorialScene from './scenes/AccountabilityTutorialScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -38,6 +39,7 @@ const config = {
     TutorialStoryScene,
     FairnessTutorialScene,
     TransparencyTutorialScene,
+    AccountabilityTutorialScene,
     ChallengeScene,
     BonusQuestionScene,
     EndPledgeScene,

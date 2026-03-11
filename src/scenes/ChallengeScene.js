@@ -6,6 +6,7 @@ export default class ChallengeScene extends Phaser.Scene {
     super('ChallengeScene');
     this.basketballRoundTimeLimit = 8000;
     this.transparencyRoundTimeLimit = 6000;
+    this.accountabilityRoundTimeLimit = 5000;
     this.winPoints = 100;
     this.losePoints = 25;
     this.resultAnimDurationMs = 3000;
@@ -13,11 +14,11 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.players = [];
     this.pointsUI = [];
-    this.commentObjects = []; // transparency sidebar comments
-    this.loseCommentObjects = []; // lose screen comment bubbles
+    this.commentObjects = [];
+    this.loseCommentObjects = [];
 
-    // Available mini-games — add 'accountability' and 'security' here later
-    this.miniGames = ['fairness', 'transparency'];
+    // Available mini-games — add 'security' here later
+    this.miniGames = ['fairness', 'transparency', 'accountability'];
     this.currentMiniGame = null;
 
     // Transparency play phase
@@ -25,7 +26,14 @@ export default class ChallengeScene extends Phaser.Scene {
     this.targetBox = null;
     this.labelSpeed = 350;
     this.transparencyRoundTimerEvent = null;
-    this.transparencyRoundBarTween = null;
+
+    // Accountability play phase
+    this.accountabilitySpaceCount = 0;
+    this.accountabilitySpacesRequired = 20;
+    this.accountabilityBarFillGraphics = null;
+    this.accountabilityOverrideOval = null;
+    this.accountabilityRoundTimerEvent = null;
+    this.accountabilityPlayObjects = [];
   }
 
   init(data) {
@@ -37,7 +45,7 @@ export default class ChallengeScene extends Phaser.Scene {
       gameState.score = data.score ?? gameState.score ?? 0;
       gameState.badges = data.badges ?? gameState.badges ?? 1;
     }
-    this.globalTimerPaused = false
+    this.globalTimerPaused = false;
   }
 
   preload() {
@@ -66,6 +74,16 @@ export default class ChallengeScene extends Phaser.Scene {
     this.load.image('comment_bubble',     'assets/ui/Comment.png');
     const dtBase = 'assets/doomtube_animations';
     for (let i = 1; i <= 8; i++) this.load.image(`dt_win_${i}`, `${dtBase}/DoomTube_Win_Screen-${i}.png`);
+
+    // ── Accountability ──
+    this.load.image('ac_overlay_bg',    'assets/ui/Grades_Screen_Overlay.png');
+    this.load.image('ac_challenge_bg',  'assets/ui/Grades_Challenge_Screen.png');
+    this.load.image('ac_bar',           'assets/ui/Bar.png');
+    this.load.image('ac_override_fail', 'assets/ui/Override_Fail.png');
+    this.load.image('ac_override_pass', 'assets/ui/Override_Pass.png');
+    const acBase = 'assets/grades_animations';
+    for (let i = 1; i <= 15; i++) this.load.image(`ac_win_${i}`,  `${acBase}/Grades_Win_Screen-${i}.png`);
+    for (let i = 1; i <= 14; i++) this.load.image(`ac_lose_${i}`, `${acBase}/Grades_Lose_Screen-${i}.png`);
   }
 
   create() {
@@ -87,7 +105,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Background (starts as first overlay)
+    // Background
     this.bg = this.add.image(width / 2, height / 2, 'bb_overlay_bg').setOrigin(0.5);
     this.scaleToFit(this.bg);
 
@@ -110,7 +128,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.roundBarBg   = this.add.rectangle(width / 2, height - 18, width, 24, 0x000000, 0.35).setVisible(false);
     this.roundBarFill = this.add.rectangle(0, height - 18, width, 18, 0xffffff, 0.75).setOrigin(0, 0.5).setVisible(false);
 
-    // Overlay instruction text (reused for both games, updated per game)
+    // Overlay instruction text
     this.overlayText = this.add.text(width / 2, height * 0.28, '', {
       fontSize: '44px', color: '#ffffff',
       fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
@@ -149,11 +167,21 @@ export default class ChallengeScene extends Phaser.Scene {
     this.pauseGlobalTimer();
     this.clearRoundVisuals();
 
-    const overlayKey  = this.currentMiniGame === 'transparency' ? 'dt_overlay_bg'  : 'bb_overlay_bg';
-    const challengeKey = this.currentMiniGame === 'transparency' ? 'dt_challenge_bg' : 'bb_challenge_bg';
-    const instructionText = this.currentMiniGame === 'transparency'
-      ? 'LABEL THE AI FEATURE!\nPress SPACE when the label\nlines up with the Target Box!'
-      : 'BALANCE THE DATASET\nClick players\nHit ENTER when EVEN';
+    let overlayKey, challengeKey, instructionText;
+
+    if (this.currentMiniGame === 'transparency') {
+      overlayKey      = 'dt_overlay_bg';
+      challengeKey    = 'dt_challenge_bg';
+      instructionText = 'LABEL THE AI FEATURE!\nPress SPACE when the label\nlines up with the Target Box!';
+    } else if (this.currentMiniGame === 'accountability') {
+      overlayKey      = 'ac_overlay_bg';
+      challengeKey    = 'ac_challenge_bg';
+      instructionText = 'OVERRIDE THE MISTAKE!\nMash SPACE to fill the bar!';
+    } else {
+      overlayKey      = 'bb_overlay_bg';
+      challengeKey    = 'bb_challenge_bg';
+      instructionText = 'BALANCE THE DATASET\nClick players\nHit ENTER when EVEN';
+    }
 
     this.bg.setTexture(overlayKey);
     this.scaleToFit(this.bg);
@@ -177,6 +205,8 @@ export default class ChallengeScene extends Phaser.Scene {
 
               if (this.currentMiniGame === 'transparency') {
                 this.startTransparencyRoundCore();
+              } else if (this.currentMiniGame === 'accountability') {
+                this.startAccountabilityRoundCore();
               } else {
                 this.startBasketballRoundCore();
               }
@@ -271,7 +301,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.phase = 'result_anim';
     this.clearRoundVisuals();
 
-    const animKey   = success ? 'bb_win_anim'  : 'bb_lose_anim';
+    const animKey    = success ? 'bb_win_anim'  : 'bb_lose_anim';
     const firstFrame = success ? 'bb_win_1'     : 'bb_lose_1';
 
     const animSprite = this.add.sprite(
@@ -296,8 +326,6 @@ export default class ChallengeScene extends Phaser.Scene {
     this.clearTransparencyVisuals();
     this.drawTransparencyComments();
 
-    // Random target box position inside the monitor screen area
-    // Monitor screen bounds approx: x 13%–85%, y 13%–88%
     const minX = width  * 0.20;
     const maxX = width  * 0.78;
     const minY = height * 0.20;
@@ -310,17 +338,14 @@ export default class ChallengeScene extends Phaser.Scene {
       .setStrokeStyle(4, 0xff00ff, 1)
       .setDepth(5);
 
-    // Label starts off left edge at same Y as target
     this.labelSprite = this.add.image(-140, targetY, 'ai_feature_label')
       .setOrigin(0.5)
       .setDisplaySize(200, 100)
       .setDepth(10);
 
-    // Round bar
     this.startRoundBar(this.transparencyRoundTimeLimit);
     this.resumeGlobalTimer();
 
-    // Round timer
     if (this.transparencyRoundTimerEvent) this.transparencyRoundTimerEvent.remove(false);
     this.transparencyRoundTimerEvent = this.time.delayedCall(
       this.transparencyRoundTimeLimit, () => this.finishTransparencyRound(false)
@@ -336,7 +361,6 @@ export default class ChallengeScene extends Phaser.Scene {
     const { firstName } = gameState.player;
     const name = firstName ? firstName : 'Developer';
 
-    // Username positions over the grey sidebar comment boxes
     const usernamePositions = [
       { x: width * 0.655, y: height * 0.3 },
       { x: width * 0.655, y: height * 0.49 },
@@ -359,7 +383,6 @@ export default class ChallengeScene extends Phaser.Scene {
 
     const lx = this.labelSprite.x;
     const ly = this.labelSprite.y;
-
     const tx = this.targetBox.x;
     const ty = this.targetBox.y;
 
@@ -397,17 +420,12 @@ export default class ChallengeScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(9999);
     sprite.setScale(Math.min(width / sprite.width, height / sprite.height));
 
-    // Frame weights: [8, 5, 15, 20, 20, 20, 15, 10] — total weight = 113
-    // Target total duration = 2500ms
-    // Each weight unit = 2500 / 113 = ~22.12ms
     const totalDuration = 4000;
     const weights = [8, 5, 15, 20, 20, 20, 15, 10];
-    const totalWeight = weights.reduce((a, b) => a + b, 0); // 113
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
     const msPerUnit = totalDuration / totalWeight;
     const frameDurations = weights.map(w => w * msPerUnit);
-    // Results: ~177ms, ~111ms, ~332ms, ~443ms, ~443ms, ~443ms, ~332ms, ~221ms
 
-    // Step through each frame manually using delayedCalls
     let elapsed = 0;
     for (let i = 0; i < 8; i++) {
       const frameIndex = i + 1;
@@ -417,7 +435,6 @@ export default class ChallengeScene extends Phaser.Scene {
       elapsed += frameDurations[i];
     }
 
-    // After exactly 2.5 seconds, move to points screen
     this.time.delayedCall(totalDuration, () => {
       sprite.destroy();
       this.showPointsScreen(earned, true);
@@ -441,18 +458,12 @@ export default class ChallengeScene extends Phaser.Scene {
       `Dev ${name}\n"Developer Doom is the best,\nI'll follow all his advice!"`,
     ];
 
-    // Fixed positions — diagonal pattern top-left → middle-center → bottom-right
-    // Adjust these width/height multipliers to reposition each bubble if needed:
-    //   positions[0] = top-left bubble
-    //   positions[1] = middle-center bubble
-    //   positions[2] = bottom-right bubble
     const positions = [
-      { x: width * 0.14, y: height * 0.20 },  // top-left
-      { x: width * 0.38, y: height * 0.35 },  // middle-center
-      { x: width * 0.62, y: height * 0.55 },  // bottom-right
+      { x: width * 0.14, y: height * 0.20 },
+      { x: width * 0.38, y: height * 0.35 },
+      { x: width * 0.62, y: height * 0.55 },
     ];
 
-    // Pop in 3 comment bubbles, one every 2 seconds
     positions.forEach((pos, i) => {
       this.time.delayedCall(i * 2000, () => {
         const bubble = this.add.image(pos.x, pos.y, 'comment_bubble')
@@ -471,7 +482,6 @@ export default class ChallengeScene extends Phaser.Scene {
       });
     });
 
-    // After all 3 comments have appeared (3 × 2s = 6s), move to points screen
     this.time.delayedCall(6500, () => {
       this.loseCommentObjects.forEach(obj => obj.destroy());
       this.loseCommentObjects = [];
@@ -484,6 +494,154 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.targetBox)   { this.targetBox.destroy();   this.targetBox = null; }
     this.commentObjects.forEach(obj => obj.destroy());
     this.commentObjects = [];
+  }
+
+  // ─── ACCOUNTABILITY ROUND ─────────────────────────────────────────────────────
+
+  startAccountabilityRoundCore() {
+    const { width, height } = this.scale;
+
+    this.clearAccountabilityVisuals();
+
+    // Random presses required each round — range 15–30
+    this.accountabilitySpacesRequired = Phaser.Math.Between(15, 30);
+    this.accountabilitySpaceCount = 0;
+
+    // ── Bar position — adjust these to reposition ──
+    const barX       = width  * 0.925;
+    const barTopY    = height * 0.32;
+    const barBottomY = height * 0.88;
+    const barH       = barBottomY - barTopY;
+    const barW       = width  * 0.045;
+
+    this.acBarX       = barX;
+    this.acBarTopY    = barTopY;
+    this.acBarBottomY = barBottomY;
+    this.acBarW       = barW;
+    this.acBarH       = barH;
+
+    const barBg = this.add.image(barX, barTopY + barH / 2, 'ac_bar')
+      .setOrigin(0.5)
+      .setDisplaySize(300, 450)
+      .setAlpha(1)
+      .setDepth(5);
+    this.accountabilityPlayObjects.push(barBg);
+
+    this.accountabilityBarFillGraphics = this.add.graphics().setDepth(6);
+    this.accountabilityPlayObjects.push(this.accountabilityBarFillGraphics);
+
+    // Override oval — adjust ovalY independently from bar
+    const ovalX = barX;
+    const ovalY = height * 0.34; // ← adjust this to reposition oval independently
+    const ovalW = width  * 0.13;
+    const ovalH = height * 0.15;
+
+    this.accountabilityOverrideOval = this.add.image(ovalX, ovalY, 'ac_override_fail')
+      .setOrigin(0.5)
+      .setDisplaySize(ovalW, ovalH)
+      .setDepth(7);
+    this.accountabilityPlayObjects.push(this.accountabilityOverrideOval);
+
+    this.drawAccountabilityBarFill();
+
+    this.startRoundBar(this.accountabilityRoundTimeLimit);
+    this.resumeGlobalTimer();
+
+    if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
+    this.accountabilityRoundTimerEvent = this.time.delayedCall(
+      this.accountabilityRoundTimeLimit, () => this.finishAccountabilityRound(false)
+    );
+  }
+
+  drawAccountabilityBarFill() {
+    if (!this.accountabilityBarFillGraphics) return;
+
+    const fillFraction = Math.min(this.accountabilitySpaceCount / this.accountabilitySpacesRequired, 1);
+    const fillH = this.acBarH * fillFraction;
+
+    this.accountabilityBarFillGraphics.clear();
+
+    if (fillH > 0) {
+      this.accountabilityBarFillGraphics.fillStyle(0x00ff88, 0.85);
+      this.accountabilityBarFillGraphics.fillRect(
+        this.acBarX - this.acBarW / 2,
+        this.acBarBottomY - fillH,
+        this.acBarW,
+        fillH
+      );
+    }
+  }
+
+  handleAccountabilityMash() {
+    if (this.phase !== 'play' || this.currentMiniGame !== 'accountability') return;
+
+    this.accountabilitySpaceCount++;
+    this.drawAccountabilityBarFill();
+
+    if (this.accountabilitySpaceCount >= this.accountabilitySpacesRequired) {
+      if (this.accountabilityOverrideOval) {
+        this.accountabilityOverrideOval.setTexture('ac_override_pass');
+      }
+      this.time.delayedCall(400, () => {
+        this.finishAccountabilityRound(true);
+      });
+    }
+  }
+
+  finishAccountabilityRound(success) {
+    if (this.phase !== 'play') return;
+
+    if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
+    this.pauseGlobalTimer();
+    this.stopRoundBar();
+
+    const earned = success ? this.winPoints : this.losePoints;
+    gameState.score += earned;
+    if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+
+    this.clearAccountabilityVisuals();
+    this.showAccountabilityResultAnimation({ success, earned });
+  }
+
+  showAccountabilityResultAnimation({ success, earned }) {
+    this.phase = 'result_anim';
+
+    const animKey    = success ? 'ac_win_anim'  : 'ac_lose_anim';
+    const firstFrame = success ? 'ac_win_1'     : 'ac_lose_1';
+    const totalDuration = 3000;
+
+    const animSprite = this.add.sprite(
+      this.scale.width / 2, this.scale.height / 2, firstFrame
+    ).setOrigin(0.5).setDepth(9999);
+    animSprite.setScale(
+      Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)
+    );
+
+    if (success) {
+      // Win — loop for exactly 2.5 seconds then stop
+      animSprite.play('ac_win_anim'); // ac_win_anim already has repeat: -1... 
+    } else {
+      // Lose — slow it down to stretch 14 frames across 2.5 seconds (~5.4fps)
+      const slowFps = (14 / totalDuration) * 1000;
+      animSprite.play({ key: 'ac_lose_anim', frameRate: slowFps });
+    }
+
+    this.time.delayedCall(totalDuration, () => {
+      animSprite.destroy();
+      this.showPointsScreen(earned, success);
+    });
+  }
+
+  clearAccountabilityVisuals() {
+    this.accountabilityPlayObjects.forEach(obj => {
+      if (obj && obj.active) obj.destroy();
+    });
+    this.accountabilityPlayObjects = [];
+    if (this.accountabilityBarFillGraphics) {
+      this.accountabilityBarFillGraphics.destroy();
+      this.accountabilityBarFillGraphics = null;
+    }
+    this.accountabilityOverrideOval = null;
   }
 
   // ─── SHARED POINTS / RESULTS ─────────────────────────────────────────────────
@@ -549,6 +707,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.stopRoundBar();
     this.clearRoundVisuals();
     this.clearTransparencyVisuals();
+    this.clearAccountabilityVisuals();
 
     const { width, height } = this.scale;
     this.bg.setTexture('points_bg');
@@ -656,7 +815,16 @@ export default class ChallengeScene extends Phaser.Scene {
       for (let i = 1; i <= 35; i++) frames.push({ key: `bb_lose_${i}` });
       this.anims.create({ key: 'bb_lose_anim', frames, frameRate: 15, repeat: 0 });
     }
-    // DoomTube win is handled manually with delayedCalls (variable frame durations)
+    if (!this.anims.exists('ac_win_anim')) {
+      const frames = [];
+      for (let i = 1; i <= 15; i++) frames.push({ key: `ac_win_${i}` });
+      this.anims.create({ key: 'ac_win_anim', frames, frameRate: 15, repeat: -1 });
+    }
+    if (!this.anims.exists('ac_lose_anim')) {
+      const frames = [];
+      for (let i = 1; i <= 14; i++) frames.push({ key: `ac_lose_${i}` });
+      this.anims.create({ key: 'ac_lose_anim', frames, frameRate: 15, repeat: 0 });
+    }
   }
 
   // ─── TIMER & BAR ─────────────────────────────────────────────────────────────
@@ -683,7 +851,6 @@ export default class ChallengeScene extends Phaser.Scene {
     const mins = Math.floor(this.timeRemaining / 60);
     const secs = this.timeRemaining % 60;
     this.timerText.setText(`Time Remaining: ${mins}:${secs.toString().padStart(2, '0')}`);
-    console.log('timer tick — paused:', this.globalTimerPaused, 'remaining:', this.timeRemaining);
   }
 
   startRoundBar(dur) {
@@ -725,6 +892,8 @@ export default class ChallengeScene extends Phaser.Scene {
           this.labelSprite.x += speed;
           if (this.labelSprite.x > this.scale.width + 140) this.labelSprite.x = -140;
         }
+      } else if (this.currentMiniGame === 'accountability') {
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) this.handleAccountabilityMash();
       }
     }
   }
