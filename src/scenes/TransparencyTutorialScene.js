@@ -1,5 +1,5 @@
 // src/scenes/TransparencyTutorialScene.js
-
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class TransparencyTutorialScene extends Phaser.Scene {
@@ -146,6 +146,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       if (this.phase !== 'play') this.handleAdvance();
     });
 
+    sessionLogger.logTutorialMiniGameStart('transparency');
     this.showIntroStep();
   }
 
@@ -200,8 +201,6 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     } else if (this.phase === 'reflection') {
       this.currentIndex++;
       if (this.currentIndex >= this.reflectionSteps.length) {
-        // Tutorial complete — move to next tutorial
-        // Change this to 'AccountabilityTutorialScene' once it's built
         this.scene.start('AccountabilityTutorialScene');
       } else {
         const step = this.reflectionSteps[this.currentIndex];
@@ -230,7 +229,6 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     this.drawSidebarComments();
 
     // ── Target box ──
-    // Fixed position: below the sidebar comment area
     const targetX = width * 0.815;
     const targetY = height * 0.78;
     const targetW = 260;
@@ -241,7 +239,6 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       .setDepth(5);
 
     // ── AI Feature Label ──
-    // Starts off the left edge, moves right at same Y as target box
     this.labelSprite = this.add.image(-140, targetY, 'ai_feature_label')
       .setOrigin(0.5)
       .setDisplaySize(200, 100)
@@ -259,7 +256,6 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const { firstName } = gameState.player;
     const name = firstName ? firstName : 'Developer';
 
-    // Y positions for each username — adjust these to line up with your comment boxes
     const usernamePositions = [
       { x: width * 0.635, y: height * 0.375 },
       { x: width * 0.635, y: height * 0.54 },
@@ -273,6 +269,11 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
         fontFamily: 'Courier, monospace',
         fontStyle: 'bold'
       }).setOrigin(0, 0).setDepth(10);
+
+      const maxW = width * 0.18;
+      while (userText.width > maxW && parseInt(userText.style.fontSize) > 10) {
+        userText.setFontSize(parseInt(userText.style.fontSize) - 1);
+      }
 
       this.commentObjects.push(userText);
     });
@@ -302,6 +303,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     this.phase = 'ended_round';
 
     this.success = success;
+    sessionLogger.logTutorialMiniGameEnd('transparency', this.success);
 
     this.cleanupPlayVisuals();
     this.showResultPhase();

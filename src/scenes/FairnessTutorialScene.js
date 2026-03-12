@@ -1,5 +1,6 @@
 // src/scenes/FairnessTutorialScene.js
 
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class FairnessTutorialScene extends Phaser.Scene {

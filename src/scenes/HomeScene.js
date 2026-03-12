@@ -1,5 +1,5 @@
 // src/scenes/HomeScene.js
-
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class HomeScene extends Phaser.Scene {
@@ -43,26 +43,24 @@ export default class HomeScene extends Phaser.Scene {
 
     // Create text left-anchored inside the bubble
     this.bubbleText = this.add.text(
-    bubbleLeft + 10,          // +10 = small left margin inside bubble
-    height * 0.505,
-    `Welcome, ${displayName}.`,
-    {
-        fontSize: '32px',
+      bubbleLeft + 10,
+      height * 0.505,
+      `Welcome, ${displayName}.`,
+      {
+        fontSize: '22px',
         color: '#ffffff',
         fontFamily: 'Courier, monospace',
         align: 'left',
-        fixedWidth: bubbleWidth
-    }
-    ).setOrigin(0, 0.5);        // 0 = left-anchored, so it never shifts
+      }
+    ).setOrigin(0, 0.5);
 
-    // Auto-shrink if text is too wide
     const maxWidth = width * 0.32;
-
+    
+    // Shrink font until text fits inside the bubble
     while (this.bubbleText.width > maxWidth) {
       const currentSize = parseInt(this.bubbleText.style.fontSize);
+      if (currentSize <= 12) break;
       this.bubbleText.setFontSize(currentSize - 2);
-
-      if (currentSize <= 18) break; // don't shrink too much
     }
 
     // ----- INVISIBLE BUTTON: TUTORIAL -----

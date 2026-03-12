@@ -1,5 +1,5 @@
 // src/scenes/TitleScene.js
-
+import sessionLogger from '../sessionLogger.js';
 export default class TitleScene extends Phaser.Scene {
   constructor() {
     super('TitleScene'); // this is the scene key

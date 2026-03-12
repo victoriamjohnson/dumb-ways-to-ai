@@ -1,12 +1,15 @@
 // src/scenes/ChallengeScene.js
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
+import { submitScore, getTopScores } from '../leaderboard.js';
 
 export default class ChallengeScene extends Phaser.Scene {
   constructor() {
     super('ChallengeScene');
-    this.basketballRoundTimeLimit = 8000;
-    this.transparencyRoundTimeLimit = 6000;
+    this.basketballRoundTimeLimit    = 8000;
+    this.transparencyRoundTimeLimit  = 6000;
     this.accountabilityRoundTimeLimit = 5000;
+    this.privacyRoundTimeLimit       = 8000;
     this.winPoints = 100;
     this.losePoints = 25;
     this.resultAnimDurationMs = 3000;
@@ -17,14 +20,13 @@ export default class ChallengeScene extends Phaser.Scene {
     this.commentObjects = [];
     this.loseCommentObjects = [];
 
-    // Available mini-games — add 'security' here later
-    this.miniGames = ['fairness', 'transparency', 'accountability'];
+    this.miniGames = ['fairness', 'transparency', 'accountability', 'privacy'];
     this.currentMiniGame = null;
 
     // Transparency play phase
     this.labelSprite = null;
     this.targetBox = null;
-    this.labelSpeed = 350;
+    this.labelSpeed = 850;
     this.transparencyRoundTimerEvent = null;
 
     // Accountability play phase
@@ -34,6 +36,17 @@ export default class ChallengeScene extends Phaser.Scene {
     this.accountabilityOverrideOval = null;
     this.accountabilityRoundTimerEvent = null;
     this.accountabilityPlayObjects = [];
+
+    // Privacy play phase
+    this.privacyToggleLeft  = false;
+    this.privacyToggleRight = false;
+    this.privacyToggleLeftGraphics  = null;
+    this.privacyToggleRightGraphics = null;
+    this.privacySaveBtn = null;
+    this.privacyXBtn    = null;
+    this.privacyCurrentPair = null;
+    this.privacyRoundTimerEvent = null;
+    this.privacyPlayObjects = [];
   }
 
   init(data) {
@@ -42,7 +55,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.bonusCorrect = !!data?.bonusCorrect;
     if (this.resumeRun) {
       this.timeRemaining = data.timeRemaining ?? this.timeRemaining ?? 120;
-      gameState.score = data.score ?? gameState.score ?? 0;
+      gameState.score  = data.score  ?? gameState.score  ?? 0;
       gameState.badges = data.badges ?? gameState.badges ?? 1;
     }
     this.globalTimerPaused = false;
@@ -84,6 +97,17 @@ export default class ChallengeScene extends Phaser.Scene {
     const acBase = 'assets/grades_animations';
     for (let i = 1; i <= 15; i++) this.load.image(`ac_win_${i}`,  `${acBase}/Grades_Win_Screen-${i}.png`);
     for (let i = 1; i <= 14; i++) this.load.image(`ac_lose_${i}`, `${acBase}/Grades_Lose_Screen-${i}.png`);
+
+    // ── Privacy ──
+    this.load.image('pr_overlay_bg',    'assets/ui/DoomGPT_Screen_Overlay.png');
+    this.load.image('pr_challenge_bg',  'assets/ui/DoomGPT_Challenge_Screen.png');
+    this.load.image('pr_btn_save',      'assets/ui/Save.png');
+    this.load.image('pr_btn_save_grey', 'assets/ui/Save_Grey.png');
+    this.load.image('pr_btn_x',         'assets/ui/X.png');
+    this.load.image('pr_btn_x_grey',    'assets/ui/X_Grey.png');
+    const dgBase = 'assets/doomgpt_animations';
+    for (let i = 1; i <= 38; i++) this.load.image(`pr_win_${i}`,  `${dgBase}/DoomGPT_Win_Screen-${i}.png`);
+    for (let i = 1; i <= 66; i++) this.load.image(`pr_lose_${i}`, `${dgBase}/DoomGPT_Lose_Screen-${i}.png`);
   }
 
   create() {
@@ -97,19 +121,18 @@ export default class ChallengeScene extends Phaser.Scene {
       gameState.score = 0;
       gameState.badges = 3;
       gameState.bonusUsed = 0;
+      gameState.usedBonusQuestions = [];
       if (!gameState.failures) gameState.failures = [];
       this.timeRemaining = 120;
+      sessionLogger.logChallengeStart();
     }
 
-    // Keys
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Background
     this.bg = this.add.image(width / 2, height / 2, 'bb_overlay_bg').setOrigin(0.5);
     this.scaleToFit(this.bg);
 
-    // Timer text
     this.timerPosGameplay = { x: width * 0.15, y: height * 0.08 };
     this.timerPosPoints   = { x: width * 0.20, y: height * 0.30 };
     this.timerText = this.add.text(
@@ -119,16 +142,13 @@ export default class ChallengeScene extends Phaser.Scene {
       }
     ).setOrigin(0.5).setDepth(10000);
 
-    // Fairness count text
     this.countText = this.add.text(width / 2, height / 2, '', {
       fontSize: '26px', color: '#ffffff', fontFamily: 'Courier, monospace'
     }).setOrigin(0.5).setVisible(false).setDepth(10);
 
-    // Round bar
     this.roundBarBg   = this.add.rectangle(width / 2, height - 18, width, 24, 0x000000, 0.35).setVisible(false);
     this.roundBarFill = this.add.rectangle(0, height - 18, width, 18, 0xffffff, 0.75).setOrigin(0, 0.5).setVisible(false);
 
-    // Overlay instruction text
     this.overlayText = this.add.text(width / 2, height * 0.28, '', {
       fontSize: '44px', color: '#ffffff',
       fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
@@ -172,15 +192,19 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.currentMiniGame === 'transparency') {
       overlayKey      = 'dt_overlay_bg';
       challengeKey    = 'dt_challenge_bg';
-      instructionText = 'LABEL THE AI FEATURE!\nPress SPACE when the label\nlines up with the Target Box!';
+      instructionText = 'LABEL THE AI FEATURE!\nPress SPACE when the label\nLINES UP with the Target Box!';
     } else if (this.currentMiniGame === 'accountability') {
       overlayKey      = 'ac_overlay_bg';
       challengeKey    = 'ac_challenge_bg';
       instructionText = 'OVERRIDE THE MISTAKE!\nMash SPACE to fill the bar!';
+    } else if (this.currentMiniGame === 'privacy') {
+      overlayKey      = 'pr_overlay_bg';
+      challengeKey    = 'pr_challenge_bg';
+      instructionText = 'PROTECT USER PRIVACY!\nToggle ON safe data & SAVE.\nIf NONE are safe, Press X.';
     } else {
       overlayKey      = 'bb_overlay_bg';
       challengeKey    = 'bb_challenge_bg';
-      instructionText = 'BALANCE THE DATASET\nClick players\nHit ENTER when EVEN';
+      instructionText = 'BALANCE THE DATASET\nClick players\nHit ENTER when \nBoys and Girls are EVEN';
     }
 
     this.bg.setTexture(overlayKey);
@@ -207,6 +231,8 @@ export default class ChallengeScene extends Phaser.Scene {
                 this.startTransparencyRoundCore();
               } else if (this.currentMiniGame === 'accountability') {
                 this.startAccountabilityRoundCore();
+              } else if (this.currentMiniGame === 'privacy') {
+                this.startPrivacyRoundCore();
               } else {
                 this.startBasketballRoundCore();
               }
@@ -220,6 +246,7 @@ export default class ChallengeScene extends Phaser.Scene {
   // ─── FAIRNESS ROUND ──────────────────────────────────────────────────────────
 
   startBasketballRoundCore() {
+    this.roundStartedAt = Date.now();
     this.clearRoundVisuals();
     this.createDatasetGrid_AlwaysMoreBoys();
     this.countText.setVisible(true);
@@ -294,6 +321,12 @@ export default class ChallengeScene extends Phaser.Scene {
     const earned = success ? this.winPoints : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    sessionLogger.logRound({
+      miniGame: 'fairness',
+      win: success,
+      roundStartedAt: this.roundStartedAt,
+      globalTimeRemaining: this.timeRemaining
+    });
     this.showBasketballResultAnimation({ success, earned });
   }
 
@@ -322,6 +355,7 @@ export default class ChallengeScene extends Phaser.Scene {
 
   startTransparencyRoundCore() {
     const { width, height } = this.scale;
+    this.roundStartedAt = Date.now();
 
     this.clearTransparencyVisuals();
     this.drawTransparencyComments();
@@ -362,18 +396,22 @@ export default class ChallengeScene extends Phaser.Scene {
     const name = firstName ? firstName : 'Developer';
 
     const usernamePositions = [
-      { x: width * 0.655, y: height * 0.3 },
+      { x: width * 0.655, y: height * 0.3  },
       { x: width * 0.655, y: height * 0.49 },
       { x: width * 0.655, y: height * 0.68 },
     ];
 
     usernamePositions.forEach((pos) => {
       const userText = this.add.text(pos.x, pos.y, `Dev ${name}`, {
-        fontSize: '30px',
-        color: '#000000',
-        fontFamily: 'Courier, monospace',
-        fontStyle: 'bold'
+        fontSize: '30px', color: '#000000',
+        fontFamily: 'Courier, monospace', fontStyle: 'bold'
       }).setOrigin(0, 0).setDepth(10);
+
+      const maxW = width * 0.18;
+      while (userText.width > maxW && parseInt(userText.style.fontSize) > 10) {
+        userText.setFontSize(parseInt(userText.style.fontSize) - 1);
+      }
+
       this.commentObjects.push(userText);
     });
   }
@@ -381,10 +419,8 @@ export default class ChallengeScene extends Phaser.Scene {
   attemptTransparencyStamp() {
     if (this.phase !== 'play' || !this.labelSprite || !this.targetBox) return;
 
-    const lx = this.labelSprite.x;
-    const ly = this.labelSprite.y;
-    const tx = this.targetBox.x;
-    const ty = this.targetBox.y;
+    const lx = this.labelSprite.x; const ly = this.labelSprite.y;
+    const tx = this.targetBox.x;   const ty = this.targetBox.y;
 
     const overlapX = Math.abs(lx - tx) < (100 + 130) * 0.55;
     const overlapY = Math.abs(ly - ty) < (50  + 50)  * 0.55;
@@ -402,6 +438,13 @@ export default class ChallengeScene extends Phaser.Scene {
     const earned = success ? this.winPoints : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+
+    sessionLogger.logRound({
+      miniGame: 'transparency',
+      win: success,
+      roundStartedAt: this.roundStartedAt,
+      globalTimeRemaining: this.timeRemaining
+    });
 
     this.clearTransparencyVisuals();
 
@@ -465,24 +508,18 @@ export default class ChallengeScene extends Phaser.Scene {
     ];
 
     positions.forEach((pos, i) => {
-      this.time.delayedCall(i * 2000, () => {
+      this.time.delayedCall(i * 1000, () => {
         const bubble = this.add.image(pos.x, pos.y, 'comment_bubble')
-          .setOrigin(0, 0)
-          .setDisplaySize(300, 150)
-          .setDepth(100 + i);
-
+          .setOrigin(0, 0).setDisplaySize(350, 200).setDepth(100 + i);
         const text = this.add.text(pos.x + 15, pos.y + 20, commentTexts[i], {
-          fontSize: '20px',
-          color: '#ffffff',
-          fontFamily: 'Courier, monospace',
-          wordWrap: { width: 270 }
+          fontSize: '20px', color: '#ffffff',
+          fontFamily: 'Courier, monospace', wordWrap: { width: 270 }
         }).setOrigin(0, 0).setDepth(101 + i);
-
         this.loseCommentObjects.push(bubble, text);
       });
     });
 
-    this.time.delayedCall(6500, () => {
+    this.time.delayedCall(4000, () => {
       this.loseCommentObjects.forEach(obj => obj.destroy());
       this.loseCommentObjects = [];
       this.showPointsScreen(earned, false);
@@ -500,14 +537,13 @@ export default class ChallengeScene extends Phaser.Scene {
 
   startAccountabilityRoundCore() {
     const { width, height } = this.scale;
+    this.roundStartedAt = Date.now();
 
     this.clearAccountabilityVisuals();
 
-    // Random presses required each round — range 15–30
     this.accountabilitySpacesRequired = Phaser.Math.Between(15, 30);
     this.accountabilitySpaceCount = 0;
 
-    // ── Bar position — adjust these to reposition ──
     const barX       = width  * 0.925;
     const barTopY    = height * 0.32;
     const barBottomY = height * 0.88;
@@ -521,25 +557,19 @@ export default class ChallengeScene extends Phaser.Scene {
     this.acBarH       = barH;
 
     const barBg = this.add.image(barX, barTopY + barH / 2, 'ac_bar')
-      .setOrigin(0.5)
-      .setDisplaySize(300, 450)
-      .setAlpha(1)
-      .setDepth(5);
+      .setOrigin(0.5).setDisplaySize(300, 450).setAlpha(1).setDepth(5);
     this.accountabilityPlayObjects.push(barBg);
 
     this.accountabilityBarFillGraphics = this.add.graphics().setDepth(6);
     this.accountabilityPlayObjects.push(this.accountabilityBarFillGraphics);
 
-    // Override oval — adjust ovalY independently from bar
     const ovalX = barX;
-    const ovalY = height * 0.34; // ← adjust this to reposition oval independently
+    const ovalY = height * 0.34;
     const ovalW = width  * 0.13;
     const ovalH = height * 0.15;
 
     this.accountabilityOverrideOval = this.add.image(ovalX, ovalY, 'ac_override_fail')
-      .setOrigin(0.5)
-      .setDisplaySize(ovalW, ovalH)
-      .setDepth(7);
+      .setOrigin(0.5).setDisplaySize(ovalW, ovalH).setDepth(7);
     this.accountabilityPlayObjects.push(this.accountabilityOverrideOval);
 
     this.drawAccountabilityBarFill();
@@ -555,30 +585,29 @@ export default class ChallengeScene extends Phaser.Scene {
 
   drawAccountabilityBarFill() {
     if (!this.accountabilityBarFillGraphics) return;
-
     const fillFraction = Math.min(this.accountabilitySpaceCount / this.accountabilitySpacesRequired, 1);
     const fillH = this.acBarH * fillFraction;
-
     this.accountabilityBarFillGraphics.clear();
-
     if (fillH > 0) {
       this.accountabilityBarFillGraphics.fillStyle(0x00ff88, 0.85);
       this.accountabilityBarFillGraphics.fillRect(
         this.acBarX - this.acBarW / 2,
         this.acBarBottomY - fillH,
-        this.acBarW,
-        fillH
+        this.acBarW, fillH
       );
     }
   }
 
   handleAccountabilityMash() {
     if (this.phase !== 'play' || this.currentMiniGame !== 'accountability') return;
-
     this.accountabilitySpaceCount++;
     this.drawAccountabilityBarFill();
-
     if (this.accountabilitySpaceCount >= this.accountabilitySpacesRequired) {
+      // Cancel the timeout immediately so it can't fire during the 400ms delay
+      if (this.accountabilityRoundTimerEvent) {
+        this.accountabilityRoundTimerEvent.remove(false);
+        this.accountabilityRoundTimerEvent = null;
+      }
       if (this.accountabilityOverrideOval) {
         this.accountabilityOverrideOval.setTexture('ac_override_pass');
       }
@@ -590,42 +619,38 @@ export default class ChallengeScene extends Phaser.Scene {
 
   finishAccountabilityRound(success) {
     if (this.phase !== 'play') return;
-
     if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
     this.pauseGlobalTimer();
     this.stopRoundBar();
-
     const earned = success ? this.winPoints : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
-
+    sessionLogger.logRound({
+      miniGame: 'accountability',
+      win: success,
+      roundStartedAt: this.roundStartedAt,
+      globalTimeRemaining: this.timeRemaining
+    });
     this.clearAccountabilityVisuals();
     this.showAccountabilityResultAnimation({ success, earned });
   }
 
   showAccountabilityResultAnimation({ success, earned }) {
     this.phase = 'result_anim';
-
-    const animKey    = success ? 'ac_win_anim'  : 'ac_lose_anim';
-    const firstFrame = success ? 'ac_win_1'     : 'ac_lose_1';
-    const totalDuration = 3000;
-
+    const firstFrame    = success ? 'ac_win_1' : 'ac_lose_1';
+    const totalDuration = 2500;
     const animSprite = this.add.sprite(
       this.scale.width / 2, this.scale.height / 2, firstFrame
     ).setOrigin(0.5).setDepth(9999);
     animSprite.setScale(
       Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)
     );
-
     if (success) {
-      // Win — loop for exactly 2.5 seconds then stop
-      animSprite.play('ac_win_anim'); // ac_win_anim already has repeat: -1... 
+      animSprite.play('ac_win_anim');
     } else {
-      // Lose — slow it down to stretch 14 frames across 2.5 seconds (~5.4fps)
       const slowFps = (14 / totalDuration) * 1000;
       animSprite.play({ key: 'ac_lose_anim', frameRate: slowFps });
     }
-
     this.time.delayedCall(totalDuration, () => {
       animSprite.destroy();
       this.showPointsScreen(earned, success);
@@ -633,9 +658,7 @@ export default class ChallengeScene extends Phaser.Scene {
   }
 
   clearAccountabilityVisuals() {
-    this.accountabilityPlayObjects.forEach(obj => {
-      if (obj && obj.active) obj.destroy();
-    });
+    this.accountabilityPlayObjects.forEach(obj => { if (obj && obj.active) obj.destroy(); });
     this.accountabilityPlayObjects = [];
     if (this.accountabilityBarFillGraphics) {
       this.accountabilityBarFillGraphics.destroy();
@@ -644,21 +667,279 @@ export default class ChallengeScene extends Phaser.Scene {
     this.accountabilityOverrideOval = null;
   }
 
+  // ─── PRIVACY ROUND ────────────────────────────────────────────────────────────
+
+  // correctSide: 'left' | 'right' | 'none'
+  // 'none' = both are violations — student must press X with nothing toggled to pass
+  getPrivacyDataPairs() {
+    return [
+      // One safe + one violation — correct = left
+      { left: 'Email\nAddress',         right: 'Banking\nInformation',     correctSide: 'left'  },
+      { left: 'Username',               right: 'Social Security\nNumber',  correctSide: 'left'  },
+      { left: 'Preferred\nLanguage',    right: 'Full Home\nAddress',       correctSide: 'left'  },
+      { left: 'App Usage\nHistory',     right: 'Text\nMessages',           correctSide: 'left'  },
+      { left: 'Device Type',            right: 'Medical\nHistory',         correctSide: 'left'  },
+      { left: 'Questions\nAsked to AI', right: 'Full Contact\nList',       correctSide: 'left'  },
+      { left: 'Account\nCreation Date', right: 'Government\nID Number',    correctSide: 'left'  },
+      { left: 'Feedback\n& Ratings',    right: 'Passwords',                correctSide: 'left'  },
+      { left: 'Display\nName',          right: 'DNA\nSample',              correctSide: 'left'  },
+      { left: 'Notification\nSettings', right: 'Parent Income',            correctSide: 'left'  },
+      // One safe + one violation — correct = right (sides swapped for variety)
+      { left: 'Full Home\nAddress',     right: 'Username',                 correctSide: 'right' },
+      { left: 'Camera\nAccess Always',  right: 'Preferred\nLanguage',      correctSide: 'right' },
+      { left: 'Location Every\n5 Min',  right: 'App Usage\nHistory',       correctSide: 'right' },
+      { left: 'Browsing\nHistory',      right: 'Device Type',              correctSide: 'right' },
+      { left: 'Sleep Schedule',         right: 'Questions\nAsked to AI',   correctSide: 'right' },
+      // Both wrong — press X with nothing toggled to pass
+      { left: 'Full Home\nAddress',     right: 'Banking\nInformation',     correctSide: 'none'  },
+      { left: 'Text\nMessages',         right: 'Social Security\nNumber',  correctSide: 'none'  },
+      { left: 'Microphone\nAlways On',  right: 'Camera\nAccess Always',    correctSide: 'none'  },
+      { left: 'Location Every\n5 Min',  right: 'Medical\nHistory',         correctSide: 'none'  },
+      { left: 'Browsing\nHistory',      right: 'Passwords',                correctSide: 'none'  },
+      { left: 'Sleep Schedule',         right: 'Friends List\nOther Apps', correctSide: 'none'  },
+    ];
+  }
+
+  startPrivacyRoundCore() {
+    const { width, height } = this.scale;
+    this.roundStartedAt = Date.now();
+
+    this.clearPrivacyVisuals();
+
+    this.privacyToggleLeft  = false;
+    this.privacyToggleRight = false;
+
+    this.privacyCurrentPair = Phaser.Utils.Array.GetRandom(this.getPrivacyDataPairs());
+
+    const leftBoxCX  = width  * 0.445;
+    const rightBoxCX = width  * 0.713;
+    const boxCY      = height * 0.432;
+
+    const leftLabel = this.add.text(leftBoxCX, boxCY, this.privacyCurrentPair.left, {
+      fontSize: '28px', color: '#5a3e00',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5).setDepth(5);
+    this.privacyPlayObjects.push(leftLabel);
+
+    const rightLabel = this.add.text(rightBoxCX, boxCY, this.privacyCurrentPair.right, {
+      fontSize: '28px', color: '#5a3e00',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5).setDepth(5);
+    this.privacyPlayObjects.push(rightLabel);
+
+    // ── Toggles ──
+    const toggleY = height * 0.58;
+    const toggleW = 90;
+    const toggleH = 42;
+
+    this.privacyToggleLeftGraphics = this.add.graphics().setDepth(6);
+    this.privacyPlayObjects.push(this.privacyToggleLeftGraphics);
+    this._drawPrivacyToggle(this.privacyToggleLeftGraphics, leftBoxCX, toggleY, toggleW, toggleH, false);
+
+    const leftZone = this.add.zone(leftBoxCX, toggleY, toggleW + 20, toggleH + 20)
+      .setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    leftZone.on('pointerdown', () => this._handlePrivacyToggleLeft());
+    this.privacyPlayObjects.push(leftZone);
+
+    this.privacyToggleRightGraphics = this.add.graphics().setDepth(6);
+    this.privacyPlayObjects.push(this.privacyToggleRightGraphics);
+    this._drawPrivacyToggle(this.privacyToggleRightGraphics, rightBoxCX, toggleY, toggleW, toggleH, false);
+
+    const rightZone = this.add.zone(rightBoxCX, toggleY, toggleW + 20, toggleH + 20)
+      .setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    rightZone.on('pointerdown', () => this._handlePrivacyToggleRight());
+    this.privacyPlayObjects.push(rightZone);
+
+    // ── SAVE button — grey on start, green when a toggle is ON ──
+    const saveCX = width  * 0.579;
+    const saveCY = height * 0.760;
+
+    this.privacySaveBtn = this.add.image(saveCX, saveCY, 'pr_btn_save_grey')
+      .setOrigin(0.5).setDisplaySize(200, 150).setDepth(8);
+    this.privacyPlayObjects.push(this.privacySaveBtn);
+
+    // ── X button — red on start, grey when a toggle is ON ──
+    const xCX = width  * 0.858;
+    const xCY = height * 0.192;
+
+    this.privacyXBtn = this.add.image(xCX, xCY, 'pr_btn_x')
+      .setOrigin(0.5).setDisplaySize(100, 100).setDepth(8)
+      .setInteractive({ useHandCursor: true });
+    this.privacyXBtn.on('pointerdown', () => this._handlePrivacySubmitX());
+    this.privacyPlayObjects.push(this.privacyXBtn);
+
+    this._refreshPrivacyButtonState();
+
+    this.startRoundBar(this.privacyRoundTimeLimit);
+    this.resumeGlobalTimer();
+
+    if (this.privacyRoundTimerEvent) this.privacyRoundTimerEvent.remove(false);
+    this.privacyRoundTimerEvent = this.time.delayedCall(
+      this.privacyRoundTimeLimit, () => this.finishPrivacyRound(false)
+    );
+  }
+
+  _drawPrivacyToggle(graphics, cx, cy, w, h, isOn) {
+    graphics.clear();
+    const r = h / 2;
+    graphics.fillStyle(isOn ? 0x4caf50 : 0xaaaaaa, 1);
+    graphics.fillRoundedRect(cx - w / 2, cy - r, w, h, r);
+    const knobX = isOn ? cx + w / 2 - r : cx - w / 2 + r;
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(knobX, cy, r - 4);
+  }
+
+  _handlePrivacyToggleLeft() {
+    if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
+    this.privacyToggleLeft = !this.privacyToggleLeft;
+    this._drawPrivacyToggle(
+      this.privacyToggleLeftGraphics,
+      this.scale.width * 0.445, this.scale.height * 0.58,
+      90, 42, this.privacyToggleLeft
+    );
+    this._refreshPrivacyButtonState();
+  }
+
+  _handlePrivacyToggleRight() {
+    if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
+    this.privacyToggleRight = !this.privacyToggleRight;
+    this._drawPrivacyToggle(
+      this.privacyToggleRightGraphics,
+      this.scale.width * 0.713, this.scale.height * 0.58,
+      90, 42, this.privacyToggleRight
+    );
+    this._refreshPrivacyButtonState();
+  }
+
+  // No toggles ON  → SAVE grey (disabled) + X red (enabled)
+  // Any toggle ON  → SAVE green (enabled) + X grey (disabled)
+  _refreshPrivacyButtonState() {
+    const anyToggled = this.privacyToggleLeft || this.privacyToggleRight;
+
+    if (anyToggled) {
+      this.privacySaveBtn.setTexture('pr_btn_save');
+      this.privacySaveBtn.setInteractive({ useHandCursor: true });
+      this.privacySaveBtn.off('pointerdown');
+      this.privacySaveBtn.on('pointerdown', () => this._handlePrivacySubmitSave());
+
+      this.privacyXBtn.setTexture('pr_btn_x_grey');
+      this.privacyXBtn.removeInteractive();
+    } else {
+      this.privacySaveBtn.setTexture('pr_btn_save_grey');
+      this.privacySaveBtn.removeInteractive();
+
+      this.privacyXBtn.setTexture('pr_btn_x');
+      this.privacyXBtn.setInteractive({ useHandCursor: true });
+      this.privacyXBtn.off('pointerdown');
+      this.privacyXBtn.on('pointerdown', () => this._handlePrivacySubmitX());
+    }
+  }
+
+  // SAVE pressed — at least one toggle is ON
+  _handlePrivacySubmitSave() {
+    if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
+    const { correctSide } = this.privacyCurrentPair;
+    let success = false;
+    if (correctSide === 'left') {
+      success = this.privacyToggleLeft && !this.privacyToggleRight;
+    } else if (correctSide === 'right') {
+      success = this.privacyToggleRight && !this.privacyToggleLeft;
+    }
+    // correctSide === 'none': any SAVE press is wrong (should have pressed X)
+    this.finishPrivacyRound(success);
+  }
+
+  // X pressed — only reachable when NO toggles are ON
+  // Pass only if the correct answer is 'none' (both options are violations)
+  _handlePrivacySubmitX() {
+    if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
+    const success = this.privacyCurrentPair.correctSide === 'none';
+    this.finishPrivacyRound(success);
+  }
+
+  finishPrivacyRound(success) {
+    if (this.phase !== 'play') return;
+    if (this.privacyRoundTimerEvent) this.privacyRoundTimerEvent.remove(false);
+    this.pauseGlobalTimer();
+    this.stopRoundBar();
+    const earned = success ? this.winPoints : this.losePoints;
+    gameState.score += earned;
+    if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    sessionLogger.logRound({
+      miniGame: 'privacy',
+      win: success,
+      roundStartedAt: this.roundStartedAt,
+      globalTimeRemaining: this.timeRemaining
+    });
+    this.clearPrivacyVisuals();
+    this.showPrivacyResultAnimation({ success, earned });
+  }
+
+  showPrivacyResultAnimation({ success, earned }) {
+    this.phase = 'result_anim';
+    const totalDuration = 2500;
+    const firstFrame = success ? 'pr_win_1' : 'pr_lose_1';
+    const animSprite = this.add.sprite(
+      this.scale.width / 2, this.scale.height / 2, firstFrame
+    ).setOrigin(0.5).setDepth(9999);
+    animSprite.setScale(
+      Math.min(this.scale.width / animSprite.width, this.scale.height / animSprite.height)
+    );
+    if (success) {
+      animSprite.play('pr_win_anim');
+    } else {
+      const slowFps = (66 / totalDuration) * 1000;
+      animSprite.play({ key: 'pr_lose_anim', frameRate: slowFps });
+    }
+    this.time.delayedCall(totalDuration, () => {
+      animSprite.destroy();
+      this.showPointsScreen(earned, success);
+    });
+  }
+
+  clearPrivacyVisuals() {
+    this.privacyPlayObjects.forEach(obj => { if (obj && obj.active) obj.destroy(); });
+    this.privacyPlayObjects = [];
+    this.privacyToggleLeftGraphics  = null;
+    this.privacyToggleRightGraphics = null;
+    this.privacySaveBtn = null;
+    this.privacyXBtn    = null;
+    this.privacyCurrentPair = null;
+  }
+
   // ─── SHARED POINTS / RESULTS ─────────────────────────────────────────────────
 
-  renderScoreboardUI() {
+  async renderScoreboardUI() {
     const { width, height } = this.scale;
-    this.updateLocalLeaderboard();
-    const lb = this.getLocalLeaderboardTop3();
+    const name = (gameState.player?.firstName || 'Developer').trim();
+
+    submitScore(name, gameState.score);
 
     this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, {
       fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold'
     }).setOrigin(0.5));
 
-    this.pointsUI.push(this.add.text(width * 0.78, height * 0.14,
-      `Top Players\n1) ${lb[0] ?? '---'}\n2) ${lb[1] ?? '---'}\n3) ${lb[2] ?? '---'}`,
-      { fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace', align: 'left' }
-    ).setOrigin(0, 0.5));
+    const lbText = this.add.text(width * 0.77, height * 0.20, 'Loading...', {
+      fontSize: '25px', color: '#ffffff',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold',
+      align: 'left', lineSpacing: 8
+    }).setOrigin(0.5).setDepth(10);
+    this.pointsUI.push(lbText);
+
+    try {
+      const top3 = await getTopScores(3);
+      if (lbText.active) {
+        const lines = top3.map((e, i) => `${i + 1})  ${e.name}  ${e.score}`);
+        while (lines.length < 3) lines.push(`${lines.length + 1})  ---`);
+        lbText.setText(lines.join('\n'));
+        const maxW = width * 0.27;
+        while (lbText.width > maxW && parseInt(lbText.style.fontSize) > 12) {
+          lbText.setFontSize(parseInt(lbText.style.fontSize) - 1);
+        }
+      }
+    } catch (err) {
+      if (lbText.active) lbText.setText('1)  ---\n2)  ---\n3)  ---');
+    }
 
     const heartY = height * 0.45;
     for (let i = 0; i < 3; i++) {
@@ -684,6 +965,43 @@ export default class ChallengeScene extends Phaser.Scene {
       fontSize: '32px', color: '#ffffff', fontFamily: 'Courier, monospace'
     }).setOrigin(0.5));
 
+    // ── Principle banner ──
+    const principles = [
+      { label: 'Be Fair',             game: 'fairness'       },
+      { label: 'Be Transparent',      game: 'transparency'   },
+      { label: 'Take Accountability', game: 'accountability' },
+      { label: 'Protect Privacy',     game: 'privacy'        },
+    ];
+
+    const bannerY = height * 0.92;
+    const fontSize = 28;
+    const separator = '  •  ';
+    const sepWidth = separator.length * fontSize * 0.6;
+    const labelWidths = principles.map(p => p.label.length * fontSize * 0.6);
+    const totalWidth  = labelWidths.reduce((a, b) => a + b, 0) + sepWidth * (principles.length - 1);
+    let currentX = width / 2 - totalWidth / 2;
+
+    principles.forEach((p, i) => {
+      if (i > 0) {
+        this.pointsUI.push(
+          this.add.text(currentX, bannerY, separator, {
+            fontSize: `${fontSize}px`, color: '#ffffff',
+            fontFamily: 'Courier, monospace', fontStyle: 'bold'
+          }).setOrigin(0, 0.5)
+        );
+        currentX += sepWidth;
+      }
+
+      this.pointsUI.push(
+        this.add.text(currentX, bannerY, p.label, {
+          fontSize: `${fontSize}px`,
+          color: p.game === this.currentMiniGame ? '#ffd400' : '#ffffff',
+          fontFamily: 'Courier, monospace', fontStyle: 'bold'
+        }).setOrigin(0, 0.5)
+      );
+      currentX += labelWidths[i];
+    });
+
     this.pointsUI.push(this.add.text(width / 2, height * 0.45 + 190, `${pointsEarned}`, {
       fontSize: '64px', color: success ? '#228B22' : '#DC143C',
       fontFamily: 'Courier, monospace', fontStyle: 'bold'
@@ -692,7 +1010,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => {
       if (this.timeRemaining <= 0) { this.showFinalResults("TIMES UP!"); return; }
       if ((gameState.badges ?? 0) <= 0) {
-        if ((gameState.bonusUsed ?? 0) < 1) { this.showBonusPopupOverlay(); }
+        if ((gameState.bonusUsed ?? 0) < 2) { this.showBonusPopupOverlay(); }
         else { this.showFinalResults("ALL LIVES LOST!"); }
         return;
       }
@@ -708,6 +1026,9 @@ export default class ChallengeScene extends Phaser.Scene {
     this.clearRoundVisuals();
     this.clearTransparencyVisuals();
     this.clearAccountabilityVisuals();
+    this.clearPrivacyVisuals();
+
+    sessionLogger.logChallengeEnd(reasonText);
 
     const { width, height } = this.scale;
     this.bg.setTexture('points_bg');
@@ -786,22 +1107,6 @@ export default class ChallengeScene extends Phaser.Scene {
     });
   }
 
-  // ─── LEADERBOARD ─────────────────────────────────────────────────────────────
-
-  updateLocalLeaderboard() {
-    const name = `${(gameState.player?.firstName || 'Developer').trim()} ${(gameState.player?.lastInitial || '').trim()}`.trim();
-    const entries = this.loadLeaderboard();
-    const idx = entries.findIndex(e => e.name === name);
-    if (idx >= 0) entries[idx].score = Math.max(entries[idx].score, gameState.score);
-    else entries.push({ name, score: gameState.score });
-    entries.sort((a, b) => b.score - a.score);
-    this.saveLeaderboard(entries.slice(0, 25));
-  }
-
-  loadLeaderboard()          { try { return JSON.parse(localStorage.getItem(this.leaderboardKey)) || []; } catch { return []; } }
-  saveLeaderboard(entries)   { localStorage.setItem(this.leaderboardKey, JSON.stringify(entries)); }
-  getLocalLeaderboardTop3()  { return this.loadLeaderboard().slice(0, 3).map(e => `${e.name} (${e.score})`); }
-
   // ─── ANIMATIONS ──────────────────────────────────────────────────────────────
 
   createAllAnimationsSafe() {
@@ -824,6 +1129,16 @@ export default class ChallengeScene extends Phaser.Scene {
       const frames = [];
       for (let i = 1; i <= 14; i++) frames.push({ key: `ac_lose_${i}` });
       this.anims.create({ key: 'ac_lose_anim', frames, frameRate: 15, repeat: 0 });
+    }
+    if (!this.anims.exists('pr_win_anim')) {
+      const frames = [];
+      for (let i = 1; i <= 42; i++) frames.push({ key: `pr_win_${i}` });
+      this.anims.create({ key: 'pr_win_anim', frames, frameRate: 15, repeat: -1 });
+    }
+    if (!this.anims.exists('pr_lose_anim')) {
+      const frames = [];
+      for (let i = 1; i <= 66; i++) frames.push({ key: `pr_lose_${i}` });
+      this.anims.create({ key: 'pr_lose_anim', frames, frameRate: 15, repeat: 0 });
     }
   }
 
@@ -865,8 +1180,8 @@ export default class ChallengeScene extends Phaser.Scene {
     this.roundBarFill.setVisible(false);
   }
 
-  resetTimerToPointsPosition()   { this.timerText.setPosition(this.timerPosPoints.x,   this.timerPosPoints.y); }
-  resetTimerToGameplayPosition()  { this.timerText.setPosition(this.timerPosGameplay.x, this.timerPosGameplay.y); }
+  resetTimerToPointsPosition()  { this.timerText.setPosition(this.timerPosPoints.x,   this.timerPosPoints.y); }
+  resetTimerToGameplayPosition() { this.timerText.setPosition(this.timerPosGameplay.x, this.timerPosGameplay.y); }
   scaleToFit(img) { img.setScale(Math.min(this.scale.width / img.width, this.scale.height / img.height)); }
 
   // ─── CLEAR VISUALS ───────────────────────────────────────────────────────────
@@ -895,6 +1210,7 @@ export default class ChallengeScene extends Phaser.Scene {
       } else if (this.currentMiniGame === 'accountability') {
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) this.handleAccountabilityMash();
       }
+      // Privacy is click-only — no keyboard handling needed
     }
   }
 }

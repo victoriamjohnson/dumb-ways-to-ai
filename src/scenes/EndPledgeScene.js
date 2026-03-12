@@ -1,4 +1,8 @@
 // src/scenes/EndPledgeScene.js
+
+import sessionLogger from '../sessionLogger.js';
+import gameState from '../gameState.js';
+
 export default class EndPledgeScene extends Phaser.Scene {
   constructor() {
     super('EndPledgeScene');
@@ -33,8 +37,14 @@ export default class EndPledgeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    const goToLoading = () => this.scene.start('LoadingScene');
-    promiseZone.on('pointerdown', goToLoading);
-    cancelZone.on('pointerdown', goToLoading);
+    promiseZone.on('pointerdown', () => {
+      sessionLogger.logResult('promised', gameState.score);
+      this.scene.start('LoadingScene');
+    });
+
+    cancelZone.on('pointerdown', () => {
+      sessionLogger.logResult('cancelled', gameState.score);
+      this.scene.start('LoadingScene');
+    });
   }
 }

@@ -1,4 +1,5 @@
 // src/scenes/LoadingScene.js
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class LoadingScene extends Phaser.Scene {

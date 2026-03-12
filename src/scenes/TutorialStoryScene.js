@@ -1,5 +1,6 @@
 // src/scenes/TutorialStoryScene.js
 
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class TutorialStoryScene extends Phaser.Scene {

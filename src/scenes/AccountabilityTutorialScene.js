@@ -1,5 +1,5 @@
 // src/scenes/AccountabilityTutorialScene.js
-
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class AccountabilityTutorialScene extends Phaser.Scene {
@@ -164,6 +164,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
       if (this.phase !== 'play') this.handleAdvance();
     });
 
+    sessionLogger.logTutorialMiniGameStart('accountability');
     this.showIntroStep();
   }
 
@@ -218,8 +219,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     } else if (this.phase === 'reflection') {
       this.currentIndex++;
       if (this.currentIndex >= this.reflectionSteps.length) {
-        // Move to next tutorial — change to PrivacyTutorialScene once built
-        this.scene.start('HomeScene');
+        this.scene.start('PrivacyTutorialScene');
       } else {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);
@@ -244,23 +244,18 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.bodyText.setVisible(false);
     this.hintText.setVisible(false);
 
-    // ── Bar position — right side of screen next to the computer ──
-    // Bar.png was drawn on a 600x600 canvas — display it tall and narrow
-    // Adjust barX, barTopY, barBottomY to reposition over your art
-    const barX       = width  * 0.925;  // horizontal position — move left/right
-    const barTopY    = height * 0.32;   // where the top of the bar is
-    const barBottomY = height * 0.88;   // where the bottom of the bar is
-    const barW       = width  * 0.045;  // width of the bar
+    const barX       = width  * 0.925;
+    const barTopY    = height * 0.32;
+    const barBottomY = height * 0.88;
+    const barW       = width  * 0.045;
     const barH       = barBottomY - barTopY;
 
-    // Store for drawBarFill
     this.barX       = barX;
     this.barTopY    = barTopY;
     this.barBottomY = barBottomY;
     this.barW       = barW;
     this.barH       = barH;
 
-    // Bar background image (full bar, dim)
     const barBg = this.add.image(barX, barTopY + barH / 2, 'bar')
         .setOrigin(0.5)
         .setDisplaySize(300, 450)
@@ -268,16 +263,13 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
         .setDepth(5);
     this.playObjects.push(barBg);
 
-    // Green fill drawn over the bar background, grows upward
     this.barFillGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.barFillGraphics);
 
-    // ── Override oval — above the bar ──
-    // Adjust ovalX, ovalY to reposition
     const ovalX = barX;
-    const ovalY = height * 0.34; // sits above the bar
-    const ovalW = width * 0.13;            // oval display width
-    const ovalH = height * 0.15;           // oval display height
+    const ovalY = height * 0.34;
+    const ovalW = width * 0.13;
+    const ovalH = height * 0.15;
 
     this.overrideOval = this.add.image(ovalX, ovalY, 'override_fail')
       .setOrigin(0.5)
@@ -313,11 +305,9 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.spaceCount++;
     this.drawBarFill();
 
-    // When bar is full — success!
     if (this.spaceCount >= this.spacesRequired) {
       if (this.overrideOval) this.overrideOval.setTexture('override_pass');
 
-      // Small delay so player sees the green oval before scene changes
       this.time.delayedCall(600, () => {
         this.endRound(true);
       });
@@ -329,6 +319,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.phase = 'ended_round';
 
     this.success = success;
+    sessionLogger.logTutorialMiniGameEnd('accountability', this.success);
 
     this.cleanupPlayVisuals();
     this.showResultPhase();

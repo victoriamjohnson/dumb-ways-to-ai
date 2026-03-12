@@ -1,5 +1,5 @@
 // src/scenes/BonusPromptScene.js
-
+import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
 export default class BonusPromptScene extends Phaser.Scene {
