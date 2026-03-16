@@ -91,14 +91,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       {
         speaker: 'Dr. Bot',
         text: `Anything beyond that? It's not our data to take.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `You'll see two data options DoomGPT wants to collect. Toggle ON the one that is safe and necessary — then press SAVE to submit.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `If neither option is safe to collect, do NOT toggle either one — just press the X button to reject them both.`
       }
     ];
 
@@ -175,7 +167,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.bodyText.setText(
       'PROTECT USER PRIVACY!\n\n' +
       'Two data types are shown. Toggle ON the one that is safe to collect,\n' +
-      'then press SAVE to submit.\n\n' +
+      'then press SAVE to submit.\n' +
       'If neither is safe, toggle nothing and press the X button.'
     );
     this.hintText.setText('Press SPACE or click to begin');
@@ -279,11 +271,11 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     // ── SAVE button — grey on start, green when a toggle is ON ──
     // SAVE center ≈ (843, 622) → x*0.579, y*0.762
     const saveCX = width  * 0.579;
-    const saveCY = height * 0.762;
+    const saveCY = height * 0.760;
 
     this.saveBtn = this.add.image(saveCX, saveCY, 'pr_btn_save_grey')
       .setOrigin(0.5)
-      .setDisplaySize(220, 75)
+      .setDisplaySize(200, 150)
       .setDepth(8);
     this.playObjects.push(this.saveBtn);
 
@@ -294,7 +286,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
     this.xBtn = this.add.image(xCX, xCY, 'pr_btn_x')
       .setOrigin(0.5)
-      .setDisplaySize(80, 80)
+      .setDisplaySize(100, 100)
       .setDepth(8)
       .setInteractive({ useHandCursor: true });
     this.xBtn.on('pointerdown', () => this.handleSubmitX());
