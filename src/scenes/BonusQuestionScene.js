@@ -6,8 +6,6 @@ export default class BonusQuestionScene extends Phaser.Scene {
   constructor() {
     super('BonusQuestionScene');
 
-    // All available bonus questions
-    // correctAnswer: the letter key that is correct
     this.questionPool = [
       {
         question: 'Which of these is NOT a principle of Responsible AI?',
@@ -66,7 +64,6 @@ export default class BonusQuestionScene extends Phaser.Scene {
     const available = this.questionPool.filter(
       (_, i) => !gameState.usedBonusQuestions.includes(i)
     );
-    // Fallback: if somehow all are used, reset and pick any
     const pool = available.length > 0 ? available : this.questionPool;
     const questionIndex = this.questionPool.indexOf(
       Phaser.Utils.Array.GetRandom(pool)
@@ -93,7 +90,6 @@ export default class BonusQuestionScene extends Phaser.Scene {
       fontStyle: 'bold'
     };
 
-    // Build answer options dynamically from the question's options object
     this.options = {};
     const letters = Object.keys(currentQuestion.options);
     letters.forEach((letter, i) => {
@@ -122,7 +118,6 @@ export default class BonusQuestionScene extends Phaser.Scene {
       this.options[letter].setColor('#ffd400');
     };
 
-    // Register only the keys that exist for this question + ENTER
     const keyString = [...letters, 'ENTER'].join(',');
     this.keys = this.input.keyboard.addKeys(keyString);
 
@@ -145,6 +140,7 @@ export default class BonusQuestionScene extends Phaser.Scene {
       sessionLogger.logBonusAnswer(this.selected, isCorrect);
 
       if (isCorrect) {
+        // Correct — earn a life back and resume
         const currentBadges = Number.isFinite(this.badges) ? this.badges : (gameState.badges ?? 0);
         gameState.badges = Math.min(3, currentBadges + 1);
         gameState.score  = this.score;
@@ -157,18 +153,39 @@ export default class BonusQuestionScene extends Phaser.Scene {
           score:             gameState.score,
           badges:            gameState.badges
         });
+
       } else {
+        // Wrong — check if there's a second unused question to offer
         gameState.score  = this.score;
         gameState.badges = 0;
 
-        this.scene.start(this.returnScene, {
-          resumeRun:         true,
-          fromBonusQuestion: true,
-          bonusCorrect:      false,
-          timeRemaining:     this.timeRemaining,
-          score:             gameState.score,
-          badges:            0
-        });
+        const stillAvailable = this.questionPool.filter(
+          (_, i) => !gameState.usedBonusQuestions.includes(i)
+        );
+
+        if (stillAvailable.length > 0 && gameState.bonusUsed < 2) {
+          // Send back to ChallengeScene's bonus popup so they can try the next question
+          this.scene.start(this.returnScene, {
+            resumeRun:         true,
+            fromBonusQuestion: true,
+            bonusCorrect:      false,
+            bonusWrongButMore: true,   // ← tells ChallengeScene to re-show popup, not end
+            timeRemaining:     this.timeRemaining,
+            score:             gameState.score,
+            badges:            0
+          });
+        } else {
+          // No more questions left — truly all lives lost
+          this.scene.start(this.returnScene, {
+            resumeRun:         true,
+            fromBonusQuestion: true,
+            bonusCorrect:      false,
+            bonusWrongButMore: false,
+            timeRemaining:     this.timeRemaining,
+            score:             gameState.score,
+            badges:            0
+          });
+        }
       }
     });
   }
