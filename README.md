@@ -109,7 +109,7 @@ Pre and post surveys measure learning outcomes across the 4 principles.
 
 ## 👩🏽‍💻 Developed By
 
-**Victoria Johnson** — UTSA, Developing AI Tools for K-12
+**Victoria Johnson** — UTSA, Developing AI Tools for K-12\n
 **Tristian Sanchez** — UTSA, Developing AI Tools for K-12
 
 ---
