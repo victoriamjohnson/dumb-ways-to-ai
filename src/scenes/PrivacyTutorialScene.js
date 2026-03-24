@@ -69,19 +69,24 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     // ---------- DIALOGUE ----------
 
     const { firstName } = gameState.player;
+    const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Doom is launching DoomGPT — an AI assistant that connects directly to users' devices, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `${dev}, Doom's latest project might be his sneakiest yet!\nHe is launching DoomGPT, an AI assistant that connects directly to users' devices.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Before it launches, you have to review what data it collects. Responsible developers only take what the AI actually needs.'
+        text: `${dev}, before it launches, you have to review what data it collects.\nThis is one of the most important decisions a developer makes!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Toggle ON what\'s safe to collect. If neither option belongs — press X.'
+        text: `${dev}, responsible developers only collect what the AI actually needs to do its job.\nAnything extra is a Dumb Way to AI.`
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: `${dev}, toggle ON what is safe to collect.\nIf neither option belongs, press X to reject them both!`
       }
     ];
 
@@ -93,15 +98,15 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Email address is safe — DoomGPT needs it to create your account and nothing more.'
+        text: `${dev}, email address is safe to collect.\nDoomGPT needs it to create your account and nothing more.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Banking information is never safe for a free AI assistant. It has no reason to touch your money.'
+        text: `${dev}, banking information is never safe for a free AI assistant.\nIt has absolutely no reason to touch your money!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'If the AI doesn\'t need it to do its job, it doesn\'t get collected. That\'s privacy.'
+        text: `If the AI does not need it to do its job, it does not get collected.\nThat is what privacy looks like in action!`
       }
     ];
 
@@ -113,26 +118,26 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Banking information should never be collected by a free AI assistant — there\'s no reason it needs access to your money.'
+        text: `${dev}, banking information should never be collected by a free AI assistant.\nThere is no reason it needs access to your money. None!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Email address is the safe choice — it\'s the minimum needed to create an account, nothing more.'
+        text: `${dev}, email address is the safe choice here.\nIt is the minimum needed to create an account and nothing more.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Doom counts on developers making quick decisions without thinking about who gets hurt.'
+        text: `Doom counts on developers making quick decisions without thinking about who gets hurt.\nDon't let him win!`
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: 'When an AI connects to someone\'s device, it\'s entering their personal space.'
+        text: `${dev}, when an AI connects to someone's device, it is entering their personal space.\nTreat it that way!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Privacy isn\'t about what you can collect. It\'s about what you should.'
+        text: `${dev}, privacy is not about what you can collect.\nIt is about what you should. Remember that every time you build something!`
       }
     ];
 

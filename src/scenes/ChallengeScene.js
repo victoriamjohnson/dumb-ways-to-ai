@@ -497,7 +497,10 @@ export default class ChallengeScene extends Phaser.Scene {
       miniGame: 'fairness',
       win: success,
       roundStartedAt: this.roundStartedAt,
-      globalTimeRemaining: this.timeRemaining
+      globalTimeRemaining: this.timeRemaining,
+      difficulty: this.tier.name,        // ← add
+      pointsEarned: earned,              // ← add
+      cumulativeScore: gameState.score,  // ← add
     });
     this.showBasketballResultAnimation({ success, earned });
   }
@@ -612,10 +615,13 @@ export default class ChallengeScene extends Phaser.Scene {
     this.roundsCompletedTotal++;
 
     sessionLogger.logRound({
-      miniGame: 'transparency',
+      miniGame: 'fairness',
       win: success,
       roundStartedAt: this.roundStartedAt,
-      globalTimeRemaining: this.timeRemaining
+      globalTimeRemaining: this.timeRemaining,
+      difficulty: this.tier.name,        // ← add
+      pointsEarned: earned,              // ← add
+      cumulativeScore: gameState.score,  // ← add
     });
 
     this.clearTransparencyVisuals();
@@ -800,10 +806,13 @@ export default class ChallengeScene extends Phaser.Scene {
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
     sessionLogger.logRound({
-      miniGame: 'accountability',
+      miniGame: 'fairness',
       win: success,
       roundStartedAt: this.roundStartedAt,
-      globalTimeRemaining: this.timeRemaining
+      globalTimeRemaining: this.timeRemaining,
+      difficulty: this.tier.name,        // ← add
+      pointsEarned: earned,              // ← add
+      cumulativeScore: gameState.score,  // ← add
     });
     this.clearAccountabilityVisuals();
     this.showAccountabilityResultAnimation({ success, earned });
@@ -1023,10 +1032,13 @@ export default class ChallengeScene extends Phaser.Scene {
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
     sessionLogger.logRound({
-      miniGame: 'privacy',
+      miniGame: 'fairness',
       win: success,
       roundStartedAt: this.roundStartedAt,
-      globalTimeRemaining: this.timeRemaining
+      globalTimeRemaining: this.timeRemaining,
+      difficulty: this.tier.name,        // ← add
+      pointsEarned: earned,              // ← add
+      cumulativeScore: gameState.score,  // ← add
     });
     this.clearPrivacyVisuals();
     this.showPrivacyResultAnimation({ success, earned });

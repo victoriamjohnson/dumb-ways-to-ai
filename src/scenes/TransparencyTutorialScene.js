@@ -72,19 +72,24 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     // ---------- DIALOGUE ----------
 
     const { firstName } = gameState.player;
+    const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Doom built DevDoomTube — a platform where AI posts comments using real users' names, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `${dev}, Developer Doom is at it again and this one is sneaky!\nHe built a platform called DevDoomTube.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'No labels. No warnings. Users have no idea AI is acting on their behalf.'
+        text: `${dev}, DevDoomTube has an AI feature that posts comments using real users' names.\nNo labels. No warnings. Users have no idea AI is acting on their behalf!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Responsible developers always make it clear when AI is involved. Stamp the label before it slides past.'
+        text: `${dev}, this is a textbook Dumb Ways to AI move.\nResponsible developers always make it clear when AI is involved.`
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: `${dev}, your job is to stamp the AI Feature label onto the comments section.\nGet it lined up before it slides past!`
       }
     ];
 
@@ -96,11 +101,11 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'The AI feature is clearly labeled now.'
+        text: `${dev}, the AI feature is clearly labeled now!\nThat is how responsible developers do it.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Users deserve to know when AI is involved — no exceptions.'
+        text: `Users deserve to know when AI is involved.\nNo exceptions. Not even for Doom!`
       }
     ];
 
@@ -112,22 +117,22 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'The AI feature went unlabeled — just like Doom planned.'
+        text: `${dev}, the AI feature went unlabeled.\nJust like Doom planned. Classic Dumb Ways to AI!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'When AI isn\'t labeled, users lose the ability to make informed choices.'
+        text: `When AI is not labeled, users lose the ability to make informed choices.\nThat is not okay!`
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: 'Transparency means users should always know when AI is involved.'
+        text: `${dev}, transparency means users should always know when AI is involved.\nAlways. No hiding it!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'If users can\'t tell what\'s AI and what\'s real — that\'s a Dumb Way to AI.'
+        text: `${dev}, if users cannot tell what is AI and what is real, that is a Dumb Way to AI.\nDon't be like Doom.`
       }
     ];
 

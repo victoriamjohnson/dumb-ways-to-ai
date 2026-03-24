@@ -13,7 +13,8 @@ export default class TutorialStoryScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.outroMode = !!(data && data.outroMode);
+    // Only treat as outro if explicitly passed — fixes the replay bug
+    this.outroMode = data === true || (data && data.outroMode === true);
   }
 
   create() {
@@ -28,6 +29,7 @@ export default class TutorialStoryScene extends Phaser.Scene {
     bg.setScale(Math.min(width / bg.width, height / bg.height));
 
     const { firstName } = gameState.player;
+    const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     // ----- DIALOG BOX TEXT -----
     const textLeftX = width * 0.12;
@@ -64,39 +66,56 @@ export default class TutorialStoryScene extends Phaser.Scene {
     this.mode = 'dialogue';
 
     // ----- INTRO VS OUTRO -----
-    const isOutro = this.outroMode;
-
-    if (isOutro) {
+    if (this.outroMode) {
       this.dialogue = [
         {
           speaker: 'Dr. Bot',
-          text: `Great work, Developer${firstName ? ` ${firstName}` : ''}. You finished the tutorial!`
+          text: `${dev}, you did it!\nTutorial complete!`
         },
         {
           speaker: 'Dr. Bot',
-          text: 'You\'ve seen what Developer Doom\'s bad decisions look like — and how to fix them.'
+          text: `${dev}, you have seen what Developer Doom's bad decisions look like.\nAnd more importantly, you know how to fix them.`
         },
         {
           speaker: 'Dr. Bot',
-          text: 'Now it\'s time for the real test. The city\'s AI systems are going live in 2 minutes.'
+          text: `Now it is time for the REAL test!\nThe city's AI systems are going live in 2 minutes.`
         },
         {
           speaker: 'Dr. Bot',
-          text: 'No explanations. No second chances. Just you and the clock.'
+          text: `No explanations. No hand-holding. Just you and the clock.\nNo pressure... okay, a little pressure.`
         },
         {
           speaker: 'Dr. Bot',
-          text: 'Head to Challenge Mode when you\'re ready. Good luck, Developer.'
+          text: `${dev}, head to Challenge Mode when you are ready.\nThe city is counting on you. Good luck!`
         }
       ];
     } else {
       this.dialogue = [
-        { speaker: 'Dr. Bot', text: 'Welcome to ResponsibleCity AI Labs.' },
-        { speaker: 'Dr. Bot', text: 'One coder, Developer Doom, keeps shipping reckless AI — and the city is paying for it.' },
-        { speaker: 'Dr. Bot', text: `That's where you come in, Developer${firstName ? ` ${firstName}` : ''}.` },
-        { speaker: 'Dr. Bot', text: 'Your job: Counter Developer Doom\'s bad designs and earn the title Certified Responsible Developer.' },
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, welcome to ResponsibleCity AI Labs!\nWe are very glad you are here.`
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, I will be honest with you.\nOne coder named Developer Doom keeps shipping reckless AI and the city is paying for it.`
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, that is where YOU come in!\nYour job: counter Doom's bad designs and earn the title Certified Responsible Developer.`
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, to do that you will need to master 4 Principles of Responsible AI.\nThink of them as your superpowers.`
+        },
         { type: 'principles' },
-        { speaker: 'Dr. Bot', text: 'Let\'s begin your training.' }
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, learn these well!\nThe city thrives when you use them. It glitches when you don't.`
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: `${dev}, let's begin your training.\nTry to keep up!`
+        }
       ];
     }
 

@@ -71,25 +71,26 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     ).setOrigin(0.5);
 
     const { firstName } = gameState.player;
+    const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     // ---------- DIALOGUE ----------
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Time to fix one of Doom's dumbest moves, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `${dev}, time to fix one of Doom's dumbest moves!\nThis one is a real head scratcher.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'He trained a co-ed recruiting AI using mostly boy players. Now it thinks boys deserve more spots on the team.'
+        text: `${dev}, he trained a co-ed recruiting AI using mostly boy players.\nNow it thinks boys deserve more spots on the team!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'AI learns from data — not from what\'s fair. Unbalanced data means unfair decisions.'
+        text: `${dev}, here is the thing about AI.\nIt learns from data, not from what is fair.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Balance the dataset so everyone gets a fair shot.'
+        text: `${dev}, unbalanced data means unfair decisions.\nBalance the dataset so everyone gets a fair shot!`
       }
     ];
 
@@ -101,11 +102,11 @@ export default class FairnessTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Your AI learned from a balanced set of boys and girls.'
+        text: `${dev}, your AI learned from a balanced set of boys and girls.\nThat is exactly how responsible developers think!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'When the data is fair, the decisions can be fair too.'
+        text: `When the data is fair, the decisions can be fair too.\nDoom never figured that out. You did!`
       }
     ];
 
@@ -117,22 +118,22 @@ export default class FairnessTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'The AI is still seeing one group more than the other.'
+        text: `${dev}, the AI is still seeing one group more than the other.\nThat is a classic Doom move.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'When one group shows up more in the data, they get picked more too — and that\'s not fair.'
+        text: `When one group shows up more in the data, they get picked more too.\nAnd that is not fair to anyone!`
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: 'Responsible AI means asking: who might be getting less of a chance?'
+        text: `${dev}, responsible AI means asking: who might be getting less of a chance?\nAlways ask that before you launch!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Before launching any system, check if your data represents everyone fairly.'
+        text: `${dev}, before launching any system, check if your data represents everyone fairly.\nGood developers check. Doom never does.`
       }
     ];
 

@@ -73,19 +73,24 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     // ---------- DIALOGUE ----------
 
     const { firstName } = gameState.player;
+    const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Doom built an AI grading system for ResponsibleCity Middle School — then walked away from it, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `${dev}, Doom did it again and this time students are paying the price!\nHe built an AI grading system for ResponsibleCity Middle School.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Now it\'s failing students on work they got right. When complaints came in, Doom said: "The AI made that decision, not me."'
+        text: `${dev}, after he launched it, Doom just walked away.\nNo monitoring. No way to fix mistakes. Classic Dumb Ways to AI!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Push the correction patch before report cards go out. That\'s what accountable developers do.'
+        text: `${dev}, now the AI is failing students on work they got right.\nWhen complaints came in, Doom said: "The AI made that decision, not me."`
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: `${dev}, that is NOT how responsible developers think!\nYou are being called in to push the correction patch before report cards go out.`
       }
     ];
 
@@ -97,11 +102,11 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'The bad grades are overridden and the patch is live.'
+        text: `${dev}, the bad grades are overridden and the patch is live!\nThe students are safe.`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Doom built it and walked away. You stayed and fixed it. That\'s the difference.'
+        text: `Doom built it and walked away.\nYou stayed and fixed it. That is the difference between a Dumb Way to AI and a responsible one!`
       }
     ];
 
@@ -113,22 +118,22 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
       },
       {
         speaker: 'Dr. Bot',
-        text: 'The report cards went out. Students got grades they didn\'t deserve.'
+        text: `${dev}, the report cards went out.\nStudents got grades they did not deserve. This did not have to happen!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'Responsible developers build systems that can be corrected — and they stick around to correct them.'
+        text: `Responsible developers build systems that can be corrected.\nAnd they stick around to correct them. Doom never does!`
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: 'Accountability means your responsibility doesn\'t end when you hit deploy.'
+        text: `${dev}, accountability means your responsibility does not end when you hit deploy.\nRemember that!`
       },
       {
         speaker: 'Dr. Bot',
-        text: 'If your AI causes harm, can it be corrected? And are you willing to fix it? If not — that\'s a Dumb Way to AI.'
+        text: `${dev}, ask yourself: if my AI causes harm, can it be corrected?\nAnd am I willing to fix it? If not, that is a Dumb Way to AI.`
       }
     ];
 

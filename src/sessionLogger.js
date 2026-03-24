@@ -87,9 +87,10 @@ function logChallengeStart() {
   _session.challenge = {
     startAt:        Date.now(),
     endAt:          null,
-    endReason:      null,   // 'timesUp' | 'allLivesLost' | 'completed'
+    endReason:      null,
     roundsCompleted: 0,
     rounds:         [],
+    highestDifficultyReached: 'easy',
     livesLostPerType: {
       fairness:       0,
       transparency:   0,
@@ -102,22 +103,35 @@ function logChallengeStart() {
 /**
  * Call after every round result (win or loss), before the points screen.
  * @param {object} opts
- * @param {string}  opts.miniGame       - 'fairness' | 'transparency' | 'accountability' | 'privacy'
- * @param {boolean} opts.win            - true = win, false = loss
- * @param {number}  opts.roundStartedAt - timestamp from when the round core started
+ * @param {string}  opts.miniGame            - 'fairness' | 'transparency' | 'accountability' | 'privacy'
+ * @param {boolean} opts.win                 - true = win, false = loss
+ * @param {number}  opts.roundStartedAt      - timestamp from when the round core started
  * @param {number}  opts.globalTimeRemaining - seconds left on the global timer
+ * @param {string}  opts.difficulty          - 'easy' | 'medium' | 'hard' | 'extreme'
+ * @param {number}  opts.pointsEarned        - points awarded this round
+ * @param {number}  opts.cumulativeScore     - total score after this round
  */
-function logRound({ miniGame, win, roundStartedAt, globalTimeRemaining }) {
+function logRound({ miniGame, win, roundStartedAt, globalTimeRemaining, difficulty, pointsEarned, cumulativeScore }) {
   if (!_session.challenge) return;
 
   _session.challenge.roundsCompleted += 1;
   const roundNumber = _session.challenge.roundsCompleted;
   const durationMs  = Date.now() - roundStartedAt;
 
+  // Track the highest difficulty tier reached this session
+  const tierOrder = ['easy', 'medium', 'hard', 'extreme'];
+  const currentHighest = _session.challenge.highestDifficultyReached ?? 'easy';
+  if (tierOrder.indexOf(difficulty) > tierOrder.indexOf(currentHighest)) {
+    _session.challenge.highestDifficultyReached = difficulty;
+  }
+
   _session.challenge.rounds.push({
     roundNumber,
     miniGame,
+    difficulty,
     win,
+    pointsEarned,
+    cumulativeScore,
     durationMs,
     globalTimeRemainingSeconds: globalTimeRemaining,
   });
