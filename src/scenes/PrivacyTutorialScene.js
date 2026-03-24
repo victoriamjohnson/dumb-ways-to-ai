@@ -14,7 +14,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.currentIndex = 0;
     this.success = false;
 
-    // Play phase state
     this.toggleLeft  = false; // Email Address
     this.toggleRight = false; // Banking Information
     this.toggleLeftGraphics  = null;
@@ -26,12 +25,12 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
   preload() {
     this.load.image('doomgpt_training_bg',      'assets/ui/DoomGPT_Training_Screen.png');
-    this.load.image('doomgpt_training_bg_fail',  'assets/ui/DoomGPT_Training_Screen_Fail.png');
-    this.load.image('doomgpt_game_bg',           'assets/ui/DoomGPT_Game_Screen.png');
-    this.load.image('pr_btn_save',               'assets/ui/Save.png');
-    this.load.image('pr_btn_save_grey',          'assets/ui/Save_Grey.png');
-    this.load.image('pr_btn_x',                  'assets/ui/X.png');
-    this.load.image('pr_btn_x_grey',             'assets/ui/X_Grey.png');
+    this.load.image('doomgpt_training_bg_fail', 'assets/ui/DoomGPT_Training_Screen_Fail.png');
+    this.load.image('doomgpt_game_bg',          'assets/ui/DoomGPT_Game_Screen.png');
+    this.load.image('pr_btn_save',              'assets/ui/Save.png');
+    this.load.image('pr_btn_save_grey',         'assets/ui/Save_Grey.png');
+    this.load.image('pr_btn_x',                 'assets/ui/X.png');
+    this.load.image('pr_btn_x_grey',            'assets/ui/X_Grey.png');
   }
 
   create() {
@@ -45,7 +44,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     bg.setScale(Math.min(width / bg.width, height / bg.height));
     this.bg = bg;
 
-    // ── Dialogue UI ──
     const textLeftX = width * 0.10;
     const speakerY  = height * 0.65;
     const bodyY     = height * 0.70;
@@ -68,74 +66,73 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       }
     ).setOrigin(0.5);
 
-    // ── Dialogue content ──
+    // ---------- DIALOGUE ----------
+
     const { firstName } = gameState.player;
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Bad news, Developer${firstName ? ` ${firstName}` : ''}. Developer Doom is launching his own AI assistant — DoomGPT.`
+        text: `Doom is launching DoomGPT — an AI assistant that connects directly to users' devices, Developer${firstName ? ` ${firstName}` : ''}.`
       },
       {
         speaker: 'Dr. Bot',
-        text: `It connects directly to your device. Your files, your folders, your messages — DoomGPT wants access to all of it.`
+        text: 'Before it launches, you have to review what data it collects. Responsible developers only take what the AI actually needs.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Before it launches, someone has to review what data DoomGPT is actually allowed to collect from its users.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Responsible developers only collect data that is absolutely necessary for the AI to do its job.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Anything beyond that? It's not our data to take.`
+        text: 'Toggle ON what\'s safe to collect. If neither option belongs — press X.'
       }
     ];
 
     this.resultStepsSuccess = [
       {
         speaker: 'Dr. Bot',
-        text: `Exactly right. That's the kind of decision that protects real people.`
+        text: '✓ CORRECT!',
+        color: '#00ff88'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Responsible developers ask: does this AI actually need this data to work? If the answer is no — it doesn't get collected.`
+        text: 'Email address is safe — DoomGPT needs it to create your account and nothing more.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `User privacy isn't a feature. It's a responsibility.`
+        text: 'Banking information is never safe for a free AI assistant. It has no reason to touch your money.'
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: 'If the AI doesn\'t need it to do its job, it doesn\'t get collected. That\'s privacy.'
       }
     ];
 
     this.resultStepsFail = [
       {
         speaker: 'Dr. Bot',
-        text: `That data is now being collected from every user who installs DoomGPT.`
+        text: '✗ INCORRECT!',
+        color: '#ff4444'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Even if it seemed like the safer option — if the AI doesn't need it, collecting it puts users at risk.`
+        text: 'Banking information should never be collected by a free AI assistant — there\'s no reason it needs access to your money.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Doom counts on developers making quick decisions without thinking about who gets hurt.`
+        text: 'Email address is the safe choice — it\'s the minimum needed to create an account, nothing more.'
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: 'Doom counts on developers making quick decisions without thinking about who gets hurt.'
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `When an AI connects to someone's device, it is entering their personal space.`
+        text: 'When an AI connects to someone\'s device, it\'s entering their personal space.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Responsible developers treat that seriously. Only collect what you need. Protect the rest.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Privacy isn't about what you can collect. It's about what you should.`
+        text: 'Privacy isn\'t about what you can collect. It\'s about what you should.'
       }
     ];
 
@@ -156,6 +153,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   showIntroStep() {
     const step = this.introSteps[this.currentIndex];
     if (!step) { this.showInstructions(); return; }
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
     this.hintText.setText('Press SPACE or click to continue');
@@ -163,6 +161,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
   showInstructions() {
     this.phase = 'instructions';
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
       'PROTECT USER PRIVACY!\n\n' +
@@ -194,16 +193,18 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
         const step = steps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor(step.color || '#ffffff');
       }
 
     } else if (this.phase === 'reflection') {
       this.currentIndex++;
       if (this.currentIndex >= this.reflectionSteps.length) {
-        this.scene.start('HomeScene');
+        this.scene.start('TutorialStoryScene', { outroMode: true });
       } else {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor('#ffffff');
       }
     }
   }
@@ -223,14 +224,14 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.toggleLeft  = false;
     this.toggleRight = false;
 
-    // ── Box centers measured from the art (1456×816) ──
-    // Left box center  ≈ (648, 353)  →  x*0.445, y*0.432
-    // Right box center ≈ (1038, 353) →  x*0.713, y*0.432
     const leftBoxCX  = width  * 0.445;
     const rightBoxCX = width  * 0.713;
     const boxCY      = height * 0.432;
+    const toggleY    = height * 0.62;
+    const toggleW    = 90;
+    const toggleH    = 42;
 
-    // ── Data labels inside the boxes ──
+    // ── Data labels ──
     const leftLabel = this.add.text(leftBoxCX, boxCY, 'Email\nAddress', {
       fontSize: '32px', color: '#5a3e00',
       fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
@@ -243,12 +244,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
     this.playObjects.push(rightLabel);
 
-    // ── Toggles — sit below the boxes ──
-    const toggleY = height * 0.62;
-    const toggleW = 90;
-    const toggleH = 42;
-
-    // Left toggle
+    // ── Left toggle ──
     this.toggleLeftGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.toggleLeftGraphics);
     this.drawToggle(this.toggleLeftGraphics, leftBoxCX, toggleY, toggleW, toggleH, false);
@@ -258,7 +254,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     leftZone.on('pointerdown', () => this.handleToggleLeft());
     this.playObjects.push(leftZone);
 
-    // Right toggle
+    // ── Right toggle ──
     this.toggleRightGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.toggleRightGraphics);
     this.drawToggle(this.toggleRightGraphics, rightBoxCX, toggleY, toggleW, toggleH, false);
@@ -268,31 +264,18 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     rightZone.on('pointerdown', () => this.handleToggleRight());
     this.playObjects.push(rightZone);
 
-    // ── SAVE button — grey on start, green when a toggle is ON ──
-    // SAVE center ≈ (843, 622) → x*0.579, y*0.762
-    const saveCX = width  * 0.579;
-    const saveCY = height * 0.760;
-
-    this.saveBtn = this.add.image(saveCX, saveCY, 'pr_btn_save_grey')
-      .setOrigin(0.5)
-      .setDisplaySize(200, 150)
-      .setDepth(8);
+    // ── SAVE button (grey until a toggle is ON) ──
+    this.saveBtn = this.add.image(width * 0.579, height * 0.760, 'pr_btn_save_grey')
+      .setOrigin(0.5).setDisplaySize(200, 150).setDepth(8);
     this.playObjects.push(this.saveBtn);
 
-    // ── X button — red on start, grey when a toggle is ON ──
-    // X center ≈ (1249, 157) → x*0.858, y*0.192
-    const xCX = width  * 0.858;
-    const xCY = height * 0.192;
-
-    this.xBtn = this.add.image(xCX, xCY, 'pr_btn_x')
-      .setOrigin(0.5)
-      .setDisplaySize(100, 100)
-      .setDepth(8)
+    // ── X button (active until a toggle is ON) ──
+    this.xBtn = this.add.image(width * 0.858, height * 0.192, 'pr_btn_x')
+      .setOrigin(0.5).setDisplaySize(100, 100).setDepth(8)
       .setInteractive({ useHandCursor: true });
     this.xBtn.on('pointerdown', () => this.handleSubmitX());
     this.playObjects.push(this.xBtn);
 
-    // Init button states
     this.refreshButtonState();
   }
 
@@ -311,49 +294,32 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   handleToggleLeft() {
     if (this.phase !== 'play') return;
     this.toggleLeft = !this.toggleLeft;
-    this.drawToggle(
-      this.toggleLeftGraphics,
-      this.scale.width  * 0.445,
-      this.scale.height * 0.62,
-      90, 42, this.toggleLeft
-    );
+    this.drawToggle(this.toggleLeftGraphics, this.scale.width * 0.445, this.scale.height * 0.62, 90, 42, this.toggleLeft);
     this.refreshButtonState();
   }
 
   handleToggleRight() {
     if (this.phase !== 'play') return;
     this.toggleRight = !this.toggleRight;
-    this.drawToggle(
-      this.toggleRightGraphics,
-      this.scale.width  * 0.713,
-      this.scale.height * 0.62,
-      90, 42, this.toggleRight
-    );
+    this.drawToggle(this.toggleRightGraphics, this.scale.width * 0.713, this.scale.height * 0.62, 90, 42, this.toggleRight);
     this.refreshButtonState();
   }
 
-  // ── Button state logic ────────────────────────────────────────────────────────
   // No toggles ON  → SAVE grey (disabled) + X red (enabled)
   // Any toggle ON  → SAVE green (enabled) + X grey (disabled)
   refreshButtonState() {
     const anyToggled = this.toggleLeft || this.toggleRight;
 
     if (anyToggled) {
-      // SAVE → green, clickable
       this.saveBtn.setTexture('pr_btn_save');
       this.saveBtn.setInteractive({ useHandCursor: true });
       this.saveBtn.off('pointerdown');
       this.saveBtn.on('pointerdown', () => this.handleSubmitSave());
-
-      // X → grey, not clickable
       this.xBtn.setTexture('pr_btn_x_grey');
       this.xBtn.removeInteractive();
     } else {
-      // SAVE → grey, not clickable
       this.saveBtn.setTexture('pr_btn_save_grey');
       this.saveBtn.removeInteractive();
-
-      // X → red, clickable
       this.xBtn.setTexture('pr_btn_x');
       this.xBtn.setInteractive({ useHandCursor: true });
       this.xBtn.off('pointerdown');
@@ -363,17 +329,14 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
   // ─── SUBMIT HANDLERS ─────────────────────────────────────────────────────────
 
-  // SAVE — only reachable when at least one toggle is ON
   // ✅ Pass: Email Address (left) ON only
   // ❌ Fail: Banking Information (right) ON only
   // ❌ Fail: Both ON
   handleSubmitSave() {
     if (this.phase !== 'play') return;
-    const success = this.toggleLeft === true && this.toggleRight === false;
-    this.endRound(success);
+    this.endRound(this.toggleLeft === true && this.toggleRight === false);
   }
 
-  // X — only reachable when NO toggles are ON
   // ❌ Always fails in tutorial (one option IS safe, so rejecting both is wrong)
   handleSubmitX() {
     if (this.phase !== 'play') return;
@@ -414,11 +377,13 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
     this.speakerText.setText(steps[0].speaker);
     this.bodyText.setText(steps[0].text);
+    this.bodyText.setColor(steps[0].color || '#ffffff');
   }
 
   startReflectionPhase() {
     this.phase = 'reflection';
     this.currentIndex = 0;
+    this.bodyText.setColor('#ffffff');
     this.bg.setTexture('doomgpt_training_bg');
     const step = this.reflectionSteps[0];
     this.speakerText.setText(step.speaker);

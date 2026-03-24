@@ -15,7 +15,6 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
 
     this.currentIndex = 0;
 
-    // Play phase
     this.barFillGraphics = null;
     this.overrideOval = null;
     this.spaceCount = 0;
@@ -40,13 +39,10 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#000814');
 
-    // ----- BACKGROUND -----
     const bg = this.add.image(centerX, centerY, 'grades_training_bg').setOrigin(0.5);
-    const scale = Math.min(width / bg.width, height / bg.height);
-    bg.setScale(scale);
+    bg.setScale(Math.min(width / bg.width, height / bg.height));
     this.bg = bg;
 
-    // ----- DIALOGUE TEXT -----
     const textLeftX = width * 0.10;
     const speakerY  = height * 0.65;
     const bodyY     = height * 0.70;
@@ -74,92 +70,73 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
       }
     ).setOrigin(0.5);
 
-    // ----- DIALOGUE CONTENT -----
+    // ---------- DIALOGUE ----------
+
     const { firstName } = gameState.player;
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `We've got a big problem, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `Doom built an AI grading system for ResponsibleCity Middle School — then walked away from it, Developer${firstName ? ` ${firstName}` : ''}.`
       },
       {
         speaker: 'Dr. Bot',
-        text: `Developer Doom built an AI grading system for ResponsibleCity Middle School.`
+        text: 'Now it\'s failing students on work they got right. When complaints came in, Doom said: "The AI made that decision, not me."'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Then he walked away from it. No monitoring. No way to fix mistakes.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Now the AI is failing students on assignments they got right — and report cards go out in seconds.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `When students complained, Doom said: "Don't blame me, the AI made that decision."`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `That's not how responsible developers think. When your AI causes harm, that's on you.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `You're being called in to do what Doom refused to do — push a correction patch before it's too late.`
+        text: 'Push the correction patch before report cards go out. That\'s what accountable developers do.'
       }
     ];
 
     this.resultStepsSuccess = [
       {
         speaker: 'Dr. Bot',
-        text: `You did it. The bad grades are overridden and the patch is live.`
+        text: '✓ CORRECT!',
+        color: '#00ff88'
       },
       {
         speaker: 'Dr. Bot',
-        text: `That's what accountability looks like — staying responsible for your AI even after it launches.`
+        text: 'The bad grades are overridden and the patch is live.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Doom built it and walked away. You stayed and fixed it. That's the difference.`
+        text: 'Doom built it and walked away. You stayed and fixed it. That\'s the difference.'
       }
     ];
 
     this.resultStepsFail = [
       {
         speaker: 'Dr. Bot',
-        text: `The report cards went out. Students got grades they didn't deserve.`
+        text: '✗ INCORRECT!',
+        color: '#ff4444'
       },
       {
         speaker: 'Dr. Bot',
-        text: `This is exactly what happens when developers abandon their AI after deployment.`
+        text: 'The report cards went out. Students got grades they didn\'t deserve.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Responsible developers build systems that can be corrected — and they stick around to correct them.`
+        text: 'Responsible developers build systems that can be corrected — and they stick around to correct them.'
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Accountability means your responsibility doesn't end when you hit deploy.`
+        text: 'Accountability means your responsibility doesn\'t end when you hit deploy.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Ask yourself: if my AI causes harm, can it be corrected? And am I willing to fix it?`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `If the answer is no — that's a dumb way to AI.`
+        text: 'If your AI causes harm, can it be corrected? And are you willing to fix it? If not — that\'s a Dumb Way to AI.'
       }
     ];
 
     this.phase = 'intro';
     this.currentIndex = 0;
 
-    // Space key handled in update()
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Click only advances dialogue, not during play
     this.input.on('pointerdown', () => {
       if (this.phase !== 'play') this.handleAdvance();
     });
@@ -172,10 +149,8 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
 
   showIntroStep() {
     const step = this.introSteps[this.currentIndex];
-    if (!step) {
-      this.showInstructions();
-      return;
-    }
+    if (!step) { this.showInstructions(); return; }
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
     this.hintText.setText('Press SPACE or click to continue');
@@ -183,11 +158,11 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
 
   showInstructions() {
     this.phase = 'instructions';
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
       'OVERRIDE THE MISTAKE!\n\n' +
-      'Doom\'s AI gave a wrong grade. Mash SPACE as fast as you can\n' +
-      'to fill the override bar all the way to the top.\n' +
+      'Mash SPACE as fast as you can to fill the override bar.\n' +
       'Fill it completely to push the correction patch!'
     );
     this.hintText.setText('Press SPACE or click to begin');
@@ -214,6 +189,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
         const step = steps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor(step.color || '#ffffff');
       }
 
     } else if (this.phase === 'reflection') {
@@ -224,6 +200,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor('#ffffff');
       }
     }
   }
@@ -236,10 +213,8 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.phase = 'play';
     this.spaceCount = 0;
 
-    // Swap to game background
     this.bg.setTexture('grades_game_bg');
 
-    // Hide dialogue UI
     this.speakerText.setVisible(false);
     this.bodyText.setVisible(false);
     this.hintText.setVisible(false);
@@ -257,23 +232,17 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.barH       = barH;
 
     const barBg = this.add.image(barX, barTopY + barH / 2, 'bar')
-        .setOrigin(0.5)
-        .setDisplaySize(300, 450)
-        .setAlpha(1)
-        .setDepth(5);
+      .setOrigin(0.5)
+      .setDisplaySize(300, 450)
+      .setDepth(5);
     this.playObjects.push(barBg);
 
     this.barFillGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.barFillGraphics);
 
-    const ovalX = barX;
-    const ovalY = height * 0.34;
-    const ovalW = width * 0.13;
-    const ovalH = height * 0.15;
-
-    this.overrideOval = this.add.image(ovalX, ovalY, 'override_fail')
+    this.overrideOval = this.add.image(barX, height * 0.34, 'override_fail')
       .setOrigin(0.5)
-      .setDisplaySize(ovalW, ovalH)
+      .setDisplaySize(width * 0.13, height * 0.15)
       .setDepth(7);
     this.playObjects.push(this.overrideOval);
 
@@ -307,33 +276,23 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
 
     if (this.spaceCount >= this.spacesRequired) {
       if (this.overrideOval) this.overrideOval.setTexture('override_pass');
-
-      this.time.delayedCall(600, () => {
-        this.endRound(true);
-      });
+      this.time.delayedCall(600, () => this.endRound(true));
     }
   }
 
   endRound(success) {
     if (this.phase !== 'play' && this.phase !== 'ended_round') return;
     this.phase = 'ended_round';
-
     this.success = success;
     sessionLogger.logTutorialMiniGameEnd('accountability', this.success);
-
     this.cleanupPlayVisuals();
     this.showResultPhase();
   }
 
   cleanupPlayVisuals() {
-    this.playObjects.forEach(obj => {
-      if (obj && obj.active) obj.destroy();
-    });
+    this.playObjects.forEach(obj => { if (obj && obj.active) obj.destroy(); });
     this.playObjects = [];
-    if (this.barFillGraphics) {
-      this.barFillGraphics.destroy();
-      this.barFillGraphics = null;
-    }
+    if (this.barFillGraphics) { this.barFillGraphics.destroy(); this.barFillGraphics = null; }
     this.overrideOval = null;
   }
 
@@ -351,21 +310,21 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
     this.speakerText.setText(steps[0].speaker);
     this.bodyText.setText(steps[0].text);
+    this.bodyText.setColor(steps[0].color || '#ffffff');
   }
 
   startReflectionPhase() {
     this.phase = 'reflection';
     this.currentIndex = 0;
-
+    this.bodyText.setColor('#ffffff');
     this.bg.setTexture('grades_training_bg');
-
     const step = this.reflectionSteps[0];
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
     this.hintText.setText('Press SPACE or click to continue');
   }
 
-  // ─── UPDATE LOOP ─────────────────────────────────────────────────────────────
+  // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update() {
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {

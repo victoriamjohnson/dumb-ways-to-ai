@@ -19,11 +19,12 @@ export default class BonusQuestionScene extends Phaser.Scene {
         correctAnswer: 'A'
       },
       {
-        question: 'When an autonomous vehicle (driverless car) makes a mistake, who is to blame?',
+        question: 'A self-driving car hits somebody\'s service animal. Who is to blame?',
         options: {
           A: 'The autonomous vehicle',
           B: 'The developer of the autonomous vehicle',
-          C: 'The person riding in the back of the autonomous vehicle'
+          C: 'The passenger of the autonomous vehicle',
+          D: 'The service animal'
         },
         correctAnswer: 'B'
       }
@@ -53,13 +54,13 @@ export default class BonusQuestionScene extends Phaser.Scene {
 
     if (!gameState.bonusUsed) gameState.bonusUsed = 0;
 
-    // Block if they've already used both bonus questions
+    // Block if both bonus questions already used
     if (gameState.bonusUsed >= 2) {
       this.time.delayedCall(150, () => this.scene.start('EndPledgeScene'));
       return;
     }
 
-    // Pick a random question, avoiding repeating one already used this run
+    // Pick a random question, avoiding one already used this run
     if (!gameState.usedBonusQuestions) gameState.usedBonusQuestions = [];
     const available = this.questionPool.filter(
       (_, i) => !gameState.usedBonusQuestions.includes(i)
@@ -73,7 +74,7 @@ export default class BonusQuestionScene extends Phaser.Scene {
     sessionLogger.logBonusTriggered(questionIndex);
 
     const boxLeft = width * 0.12;
-    const boxTop  = height * 0.60;
+    const boxTop  = height * 0.62;
 
     this.add.text(boxLeft, boxTop, currentQuestion.question, {
       fontSize: '24px',
@@ -140,7 +141,7 @@ export default class BonusQuestionScene extends Phaser.Scene {
       sessionLogger.logBonusAnswer(this.selected, isCorrect);
 
       if (isCorrect) {
-        // Correct — earn a life back and resume
+        // ── Correct: restore a life and resume ──
         const currentBadges = Number.isFinite(this.badges) ? this.badges : (gameState.badges ?? 0);
         gameState.badges = Math.min(3, currentBadges + 1);
         gameState.score  = this.score;
@@ -155,7 +156,7 @@ export default class BonusQuestionScene extends Phaser.Scene {
         });
 
       } else {
-        // Wrong — check if there's a second unused question to offer
+        // ── Wrong: check if there's still an unused question left ──
         gameState.score  = this.score;
         gameState.badges = 0;
 
@@ -164,23 +165,22 @@ export default class BonusQuestionScene extends Phaser.Scene {
         );
 
         if (stillAvailable.length > 0 && gameState.bonusUsed < 2) {
-          // Send back to ChallengeScene's bonus popup so they can try the next question
+          // Another question exists — send them back to ChallengeScene which
+          // will see badges === 0 and re-show the bonus popup for the next question
           this.scene.start(this.returnScene, {
             resumeRun:         true,
             fromBonusQuestion: true,
             bonusCorrect:      false,
-            bonusWrongButMore: true,   // ← tells ChallengeScene to re-show popup, not end
             timeRemaining:     this.timeRemaining,
             score:             gameState.score,
             badges:            0
           });
         } else {
-          // No more questions left — truly all lives lost
+          // Both questions used or none left — truly game over
           this.scene.start(this.returnScene, {
             resumeRun:         true,
             fromBonusQuestion: true,
             bonusCorrect:      false,
-            bonusWrongButMore: false,
             timeRemaining:     this.timeRemaining,
             score:             gameState.score,
             badges:            0

@@ -9,7 +9,6 @@ export default class TutorialStoryScene extends Phaser.Scene {
   }
 
   preload() {
-    // Background art for the main tutorial dialog screen
     this.load.image('tutorial_bg', 'assets/ui/Tutorial_Screen.png');
   }
 
@@ -22,19 +21,16 @@ export default class TutorialStoryScene extends Phaser.Scene {
 
     // ----- BACKGROUND -----
     const bg = this.add.image(centerX, centerY, 'tutorial_bg').setOrigin(0.5);
-    const scaleX = width / bg.width;
-    const scaleY = height / bg.height;
-    const scale = Math.min(scaleX, scaleY);
-    bg.setScale(scale);
+    bg.setScale(Math.min(width / bg.width, height / bg.height));
 
     const { firstName } = gameState.player;
 
-    // ----- DIALOG BOX TEXT (inside big black box at bottom) -----
-    const textLeftX = width * 0.12;      // left margin inside the box
-    const speakerY  = height * 0.65;     // speaker name
-    const bodyY     = height * 0.70;    // main text
+    // ----- DIALOG BOX TEXT -----
+    const textLeftX = width * 0.12;
+    const speakerY  = height * 0.65;
+    const bodyY     = height * 0.70;
 
-    this.dialogueBox = bg; // reuse bg as a reference
+    this.dialogueBox = bg;
 
     this.speakerText = this.add.text(textLeftX, speakerY, '', {
       fontSize: '26px',
@@ -63,25 +59,57 @@ export default class TutorialStoryScene extends Phaser.Scene {
 
     this.mode = 'dialogue';
 
-    // 🎯 SHORT, FUN INTRO WITH DEVELOPER DOOM
-    this.dialogue = [
-      { speaker: 'Dr. Bot', text: 'Welcome to ResponsibleCity AI Labs.' },
-      { speaker: 'Dr. Bot', text: 'Around here we say: "Building AI that puts people first."' },
-      { speaker: 'Dr. Bot', text: 'But not everyone here follows the rules…' },
-      { speaker: 'Dr. Bot', text: 'One coder, Developer Doom, keeps shipping reckless AI.' },
-      { speaker: 'Dr. Bot', text: 'Now the city’s AI for school, sports, and media is glitching everywhere.' },
-      { speaker: 'Dr. Bot', text: `That’s where you come in, Developer${firstName ? ` ${firstName}` : ''}.` },
-      { speaker: 'Dr. Bot', text: 'Your job: Counter Developer Doom’s bad designs and earn the title Certified Responsible Developer.' },
-      { speaker: 'Dr. Bot', text: 'To do that, you’ll use 4 Principles of Responsible AI.' },
-      { type: 'principles' },
-      { speaker: 'Dr. Bot', text: 'Use them well, and the city thrives. \nIgnore them… and you’re no better than Developer Doom.' },
-      { speaker: 'Dr. Bot', text: 'Let’s begin your training.' }
-    ];
+    // ----- CHECK FOR OUTRO MODE -----
+    const data = this.scene.settings.data;
+    const isOutro = data && data.outroMode;
+
+    if (isOutro) {
+      // Outro dialogue shown after all 4 tutorial microgames are complete
+      this.dialogue = [
+        {
+          speaker: 'Dr. Bot',
+          text: `Great work, Developer${firstName ? ` ${firstName}` : ''}. You finished the tutorial!`
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: 'You\'ve seen what Developer Doom\'s bad decisions look like — and how to fix them.'
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: 'Now it\'s time for the real test. The city\'s AI systems are going live in 2 minutes.'
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: 'No explanations. No second chances. Just you and the clock.'
+        },
+        {
+          speaker: 'Dr. Bot',
+          text: 'Head to Challenge Mode when you\'re ready. Good luck, Developer.'
+        }
+      ];
+    } else {
+      // Intro dialogue shown at the start of the tutorial
+      this.dialogue = [
+        { speaker: 'Dr. Bot', text: 'Welcome to ResponsibleCity AI Labs.' },
+        { speaker: 'Dr. Bot', text: 'One coder, Developer Doom, keeps shipping reckless AI — and the city is paying for it.' },
+        { speaker: 'Dr. Bot', text: `That's where you come in, Developer${firstName ? ` ${firstName}` : ''}.` },
+        { speaker: 'Dr. Bot', text: 'Your job: counter Doom\'s bad designs and earn the title Certified Responsible Developer.' },
+        { type: 'principles' },
+        { speaker: 'Dr. Bot', text: 'Let\'s begin your training.' }
+      ];
+    }
 
     this.currentIndex = 0;
 
     this.input.keyboard.on('keyup-SPACE', () => this.advanceDialogue());
     this.input.on('pointerdown', () => this.advanceDialogue());
+
+    // log differently depending on intro vs outro
+    if (isOutro) {
+      sessionLogger.logTutorialComplete();
+    } else {
+      sessionLogger.logTutorialStart();
+    }
 
     this.showCurrentStep();
   }
@@ -92,7 +120,7 @@ export default class TutorialStoryScene extends Phaser.Scene {
     const centerY = height / 2;
 
     if (this.currentIndex >= this.dialogue.length) {
-      this.startFairnessTutorial();
+      this.endDialogue();
       return;
     }
 
@@ -101,12 +129,11 @@ export default class TutorialStoryScene extends Phaser.Scene {
     if (step.type === 'principles') {
       this.mode = 'principles';
 
-      // Hide normal dialogue while showing the principles slide
       this.speakerText.setVisible(false);
       this.bodyText.setVisible(false);
 
       if (this.principlesTitle) this.principlesTitle.destroy();
-      if (this.principlesList) this.principlesList.destroy();
+      if (this.principlesList)  this.principlesList.destroy();
 
       this.principlesTitle = this.add.text(
         centerX,
@@ -140,14 +167,8 @@ export default class TutorialStoryScene extends Phaser.Scene {
     // Back to normal dialogue
     this.mode = 'dialogue';
 
-    if (this.principlesTitle) {
-      this.principlesTitle.destroy();
-      this.principlesTitle = null;
-    }
-    if (this.principlesList) {
-      this.principlesList.destroy();
-      this.principlesList = null;
-    }
+    if (this.principlesTitle) { this.principlesTitle.destroy(); this.principlesTitle = null; }
+    if (this.principlesList)  { this.principlesList.destroy();  this.principlesList  = null; }
 
     this.speakerText.setVisible(true);
     this.bodyText.setVisible(true);
@@ -161,7 +182,16 @@ export default class TutorialStoryScene extends Phaser.Scene {
     this.showCurrentStep();
   }
 
-  startFairnessTutorial() {
-    this.scene.start('FairnessTutorialScene');
+  endDialogue() {
+    const data = this.scene.settings.data;
+    const isOutro = data && data.outroMode;
+
+    if (isOutro) {
+      // After outro, send student back to HomeScene to choose Challenge Mode
+      this.scene.start('HomeScene');
+    } else {
+      // After intro, start the first tutorial microgame
+      this.scene.start('FairnessTutorialScene');
+    }
   }
 }

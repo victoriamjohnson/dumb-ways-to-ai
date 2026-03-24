@@ -6,12 +6,54 @@ import { submitScore, getTopScores } from '../leaderboard.js';
 export default class ChallengeScene extends Phaser.Scene {
   constructor() {
     super('ChallengeScene');
-    this.basketballRoundTimeLimit    = 8000;
-    this.transparencyRoundTimeLimit  = 6000;
-    this.accountabilityRoundTimeLimit = 5000;
-    this.privacyRoundTimeLimit       = 8000;
-    this.winPoints = 100;
-    this.losePoints = 25;
+
+    // ── Difficulty tiers — advance every 5 rounds ─────────────────────────────
+    this.difficultyTiers = [
+      {
+        name: 'easy',
+        labelSpeed:               550,
+        acSpacesMin: 10, acSpacesMax: 15,
+        basketballTimeLimit:   10000,
+        transparencyTimeLimit:  8000,
+        accountabilityTimeLimit:7000,
+        privacyTimeLimit:      10000,
+      },
+      {
+        name: 'medium',
+        labelSpeed:               750,
+        acSpacesMin: 15, acSpacesMax: 20,
+        basketballTimeLimit:    8000,
+        transparencyTimeLimit:  6000,
+        accountabilityTimeLimit:5000,
+        privacyTimeLimit:       8000,
+      },
+      {
+        name: 'hard',
+        labelSpeed:               950,
+        acSpacesMin: 20, acSpacesMax: 25,
+        basketballTimeLimit:    6000,
+        transparencyTimeLimit:  4000,
+        accountabilityTimeLimit:4000,
+        privacyTimeLimit:       6000,
+      },
+      {
+        name: 'extreme',
+        labelSpeed:               1050,
+        acSpacesMin: 25, acSpacesMax: 35,
+        basketballTimeLimit:    5000,
+        transparencyTimeLimit:  3000,
+        accountabilityTimeLimit:3000,
+        privacyTimeLimit:       5000,
+      },
+    ];
+    this.currentTierIndex     = 0;
+    this.roundsCompletedTotal = 0;
+
+    // ── Points ────────────────────────────────────────────────────────────────
+    this.baseWinPoints = 100;
+    this.speedBonusMax = 100;
+    this.losePoints    = 25;
+    this.winPoints     = 100; // kept so nothing breaks
     this.resultAnimDurationMs = 3000;
     this.leaderboardKey = 'dwai_leaderboard_v1';
 
@@ -26,7 +68,7 @@ export default class ChallengeScene extends Phaser.Scene {
     // Transparency play phase
     this.labelSprite = null;
     this.targetBox = null;
-    this.labelSpeed = 850;
+    this.labelSpeed = 350; // overridden by tier at runtime
     this.transparencyRoundTimerEvent = null;
 
     // Accountability play phase
@@ -49,14 +91,29 @@ export default class ChallengeScene extends Phaser.Scene {
     this.privacyPlayObjects = [];
   }
 
+  // ── Convenience getter — always use this for current tier settings ──────────
+  get tier() {
+    return this.difficultyTiers[Math.min(this.currentTierIndex, this.difficultyTiers.length - 1)];
+  }
+
+  // ── Speed-based win points ────────────────────────────────────────────────
+  calculateWinPoints(roundTimeLimit) {
+    const elapsed    = Date.now() - this.roundStartedAt;
+    const fraction   = Math.max(0, Math.min(1, 1 - elapsed / roundTimeLimit));
+    const speedBonus = Math.round(this.speedBonusMax * fraction);
+    return this.baseWinPoints + speedBonus;
+  }
+
   init(data) {
     this.resumeRun = !!data?.resumeRun;
     this.fromBonusQuestion = !!data?.fromBonusQuestion;
     this.bonusCorrect = !!data?.bonusCorrect;
     if (this.resumeRun) {
-      this.timeRemaining = data.timeRemaining ?? this.timeRemaining ?? 120;
-      gameState.score  = data.score  ?? gameState.score  ?? 0;
-      gameState.badges = data.badges ?? gameState.badges ?? 1;
+      this.timeRemaining        = data.timeRemaining        ?? this.timeRemaining ?? 120;
+      gameState.score           = data.score                ?? gameState.score    ?? 0;
+      gameState.badges          = data.badges               ?? gameState.badges   ?? 1;
+      this.currentTierIndex     = data.currentTierIndex     ?? 0;
+      this.roundsCompletedTotal = data.roundsCompletedTotal ?? 0;
     }
     this.globalTimerPaused = false;
   }
@@ -77,7 +134,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.load.image('player_girl_deleted',    'assets/ui/Girl_Player_Deleted.png');
     const bbBase = 'assets/basketball_animations';
     for (let i = 1; i <= 35; i++) this.load.image(`bb_lose_${i}`, `${bbBase}/Basketball_Lose_Screen_-${i}.png`);
-    for (let i = 1; i <= 13; i++) this.load.image(`bb_win_${i}`,  `${bbBase}/Basketball_Win_Screen_-${i}.png`);
+    for (let i = 1; i <= 29; i++) this.load.image(`bb_win_${i}`,  `${bbBase}/Basketball_Win_Screen_-${i}.png`);
 
     // ── Transparency ──
     this.load.image('dt_overlay_bg',      'assets/ui/DoomTube_Screen_Overlay.png');
@@ -119,11 +176,16 @@ export default class ChallengeScene extends Phaser.Scene {
 
     if (!this.resumeRun) {
       gameState.score = 0;
-      gameState.badges = 3;
+      gameState.badges = 4;
       gameState.bonusUsed = 0;
       gameState.usedBonusQuestions = [];
       if (!gameState.failures) gameState.failures = [];
-      this.timeRemaining = 120;
+      this.timeRemaining        = 120;
+      this.currentTierIndex     = 0;
+      this.roundsCompletedTotal = 0;
+      this._firstPassPool = [];
+      this._firstPassDone = false;
+      this._lastMiniGame = null;
       sessionLogger.logChallengeStart();
     }
 
@@ -164,18 +226,127 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.fromBonusQuestion) {
       this.showBonusResultScreen(this.bonusCorrect);
     } else {
-      this.startNextRound();
+      // Show easy-mode splash first, then start
+      this.showDifficultySplash(0, () => this.startNextRound());
     }
+  }
+
+  // ─── DIFFICULTY SPLASH ───────────────────────────────────────────────────────
+
+  showDifficultySplash(tierIndex, onComplete) {
+    this.pauseGlobalTimer();
+    this.phase = 'difficulty_splash';
+
+    const { width, height } = this.scale;
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 1).setDepth(8000);
+
+    const configs = [
+      { white: "Let's start ", colored: 'SLOW...',              color: '#00ff88', pulseScale: null,  pulseDuration: null },
+      { white: 'Now ',         colored: 'FASTER!',              color: '#ffd400', pulseScale: 1.04,  pulseDuration: 600  },
+      { white: 'Now ',         colored: 'EVEN FASTER!!',        color: '#ff8800', pulseScale: 1.08,  pulseDuration: 350  },
+      { white: '',             colored: 'EXTREMELY FAST!!!',     color: '#ff2222', pulseScale: 1.12,  pulseDuration: 150  },
+    ];
+
+    // Hard mode white part is "Now EVEN FASTER!!" — only "EVEN FASTER!!" is colored
+    // so white is "Now " and colored is "EVEN FASTER!!"
+    // Extreme: full line is "NOW EXTREMELY FAST!!!" — "NOW " is white, "EXTREMELY FAST!!!" is colored
+    const whiteConfigs = [
+      "Let's start ",
+      'Now ',
+      'Now ',
+      'NOW ',
+    ];
+
+    const cfg      = configs[Math.min(tierIndex, configs.length - 1)];
+    const whiteTxt = whiteConfigs[Math.min(tierIndex, whiteConfigs.length - 1)];
+    const fontSize = 52;
+    const fontStyle = { fontSize: `${fontSize}px`, fontFamily: 'Courier, monospace', fontStyle: 'bold' };
+
+    // Measure widths to centre the combined line
+    const whiteDummy = this.add.text(0, -9999, whiteTxt, { ...fontStyle, color: '#ffffff' }).setOrigin(0, 0.5);
+    const whiteWidth = whiteDummy.width;
+    whiteDummy.destroy();
+
+    const totalDummy = this.add.text(0, -9999, whiteTxt + cfg.colored, { ...fontStyle, color: '#ffffff' }).setOrigin(0, 0.5);
+    const totalWidth = totalDummy.width;
+    totalDummy.destroy();
+
+    const startX = width / 2 - totalWidth / 2;
+
+    const whitePart = whiteTxt
+      ? this.add.text(startX, height / 2, whiteTxt, { ...fontStyle, color: '#ffffff' })
+          .setOrigin(0, 0.5).setDepth(8001)
+      : null;
+
+    const colorPart = this.add.text(startX + whiteWidth, height / 2, cfg.colored, { ...fontStyle, color: cfg.color })
+      .setOrigin(0, 0.5).setDepth(8001);
+
+    // Apply pulse only to the colored word, and only if pulseScale is set
+    if (cfg.pulseScale !== null) {
+      this.tweens.add({
+        targets: colorPart,
+        scaleX: cfg.pulseScale, scaleY: cfg.pulseScale,
+        duration: cfg.pulseDuration,
+        yoyo: true, repeat: -1, ease: 'Sine.InOut'
+      });
+    }
+
+    this.time.delayedCall(2000, () => {
+      overlay.destroy();
+      if (whitePart) whitePart.destroy();
+      colorPart.destroy();
+      this.resumeGlobalTimer();
+      onComplete();
+    });
   }
 
   // ─── ROUND PICKER ────────────────────────────────────────────────────────────
 
   pickNextMiniGame() {
-    return Phaser.Utils.Array.GetRandom(this.miniGames);
+    if (!this._firstPassPool || this._firstPassPool.length === 0) {
+      if (this._firstPassDone) {
+        const choices = this.miniGames.filter(g => g !== this._lastMiniGame);
+        const next = Phaser.Utils.Array.GetRandom(choices);
+        this._lastMiniGame = next;
+        return next;
+      }
+      this._firstPassPool = Phaser.Utils.Array.Shuffle([...this.miniGames]);
+
+      // Prevent the first game of the new pass from matching the last game played
+      if (this._firstPassPool[0] === this._lastMiniGame) {
+        this._firstPassPool.push(this._firstPassPool.shift());
+      }
+
+      this._firstPassDone = false;
+    }
+
+    const next = this._firstPassPool.shift();
+    if (this._firstPassPool.length === 0) this._firstPassDone = true;
+    this._lastMiniGame = next;
+    return next;
   }
 
   startNextRound() {
     if (this.timeRemaining <= 0 || this.phase === 'ended') return;
+
+    // Check if a full pass of 5 rounds just completed and difficulty should increase
+    const newTierIndex = Math.min(
+      Math.floor(this.roundsCompletedTotal / 5),
+      this.difficultyTiers.length - 1
+    );
+
+    if (newTierIndex > this.currentTierIndex) {
+      this.currentTierIndex = newTierIndex;
+      // Fresh shuffle for the new tier
+      this._firstPassPool = [];
+      this._firstPassDone = false;
+      this.showDifficultySplash(this.currentTierIndex, () => {
+        this.currentMiniGame = this.pickNextMiniGame();
+        this.playInstructionsThenStartRound();
+      });
+      return;
+    }
+
     this.currentMiniGame = this.pickNextMiniGame();
     this.playInstructionsThenStartRound();
   }
@@ -216,7 +387,7 @@ export default class ChallengeScene extends Phaser.Scene {
       targets: this.overlayText, x: this.scale.width / 2,
       duration: 450, ease: 'Cubic.Out',
       onComplete: () => {
-        this.time.delayedCall(2100, () => {
+        this.time.delayedCall(2200, () => {
           this.tweens.add({
             targets: this.overlayText, x: this.scale.width * 2,
             duration: 450, ease: 'Cubic.In',
@@ -226,6 +397,7 @@ export default class ChallengeScene extends Phaser.Scene {
               this.scaleToFit(this.bg);
               this.resetTimerToGameplayPosition();
               this.phase = 'play';
+              this.resumeGlobalTimer();
 
               if (this.currentMiniGame === 'transparency') {
                 this.startTransparencyRoundCore();
@@ -251,11 +423,10 @@ export default class ChallengeScene extends Phaser.Scene {
     this.createDatasetGrid_AlwaysMoreBoys();
     this.countText.setVisible(true);
     this.updateCounts();
-    this.startRoundBar(this.basketballRoundTimeLimit);
-    this.resumeGlobalTimer();
+    this.startRoundBar(this.tier.basketballTimeLimit);
     if (this.roundTimerEvent) this.roundTimerEvent.remove(false);
     this.roundTimerEvent = this.time.delayedCall(
-      this.basketballRoundTimeLimit, () => this.handleBasketballTimeout()
+      this.tier.basketballTimeLimit, () => this.handleBasketballTimeout()
     );
   }
 
@@ -316,11 +487,12 @@ export default class ChallengeScene extends Phaser.Scene {
   finishBasketballRound({ success }) {
     if (this.phase !== 'play') return;
     if (this.roundTimerEvent) this.roundTimerEvent.remove(false);
-    this.pauseGlobalTimer();
     this.stopRoundBar();
-    const earned = success ? this.winPoints : this.losePoints;
+    this.pauseGlobalTimer();
+    const earned = success ? this.calculateWinPoints(this.tier.basketballTimeLimit) : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    this.roundsCompletedTotal++;
     sessionLogger.logRound({
       miniGame: 'fairness',
       win: success,
@@ -377,12 +549,11 @@ export default class ChallengeScene extends Phaser.Scene {
       .setDisplaySize(200, 100)
       .setDepth(10);
 
-    this.startRoundBar(this.transparencyRoundTimeLimit);
-    this.resumeGlobalTimer();
+    this.startRoundBar(this.tier.transparencyTimeLimit);
 
     if (this.transparencyRoundTimerEvent) this.transparencyRoundTimerEvent.remove(false);
     this.transparencyRoundTimerEvent = this.time.delayedCall(
-      this.transparencyRoundTimeLimit, () => this.finishTransparencyRound(false)
+      this.tier.transparencyTimeLimit, () => this.finishTransparencyRound(false)
     );
   }
 
@@ -432,12 +603,13 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.phase !== 'play') return;
 
     if (this.transparencyRoundTimerEvent) this.transparencyRoundTimerEvent.remove(false);
-    this.pauseGlobalTimer();
     this.stopRoundBar();
+    this.pauseGlobalTimer();
 
-    const earned = success ? this.winPoints : this.losePoints;
+    const earned = success ? this.calculateWinPoints(this.tier.transparencyTimeLimit) : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    this.roundsCompletedTotal++;
 
     sessionLogger.logRound({
       miniGame: 'transparency',
@@ -541,7 +713,9 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.clearAccountabilityVisuals();
 
-    this.accountabilitySpacesRequired = Phaser.Math.Between(15, 30);
+    this.accountabilitySpacesRequired = Phaser.Math.Between(
+      this.tier.acSpacesMin, this.tier.acSpacesMax
+    );
     this.accountabilitySpaceCount = 0;
 
     const barX       = width  * 0.925;
@@ -574,12 +748,11 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.drawAccountabilityBarFill();
 
-    this.startRoundBar(this.accountabilityRoundTimeLimit);
-    this.resumeGlobalTimer();
+    this.startRoundBar(this.tier.accountabilityTimeLimit);
 
     if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
     this.accountabilityRoundTimerEvent = this.time.delayedCall(
-      this.accountabilityRoundTimeLimit, () => this.finishAccountabilityRound(false)
+      this.tier.accountabilityTimeLimit, () => this.finishAccountabilityRound(false)
     );
   }
 
@@ -620,11 +793,12 @@ export default class ChallengeScene extends Phaser.Scene {
   finishAccountabilityRound(success) {
     if (this.phase !== 'play') return;
     if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
-    this.pauseGlobalTimer();
     this.stopRoundBar();
-    const earned = success ? this.winPoints : this.losePoints;
+    this.pauseGlobalTimer();
+    const earned = success ? this.calculateWinPoints(this.tier.accountabilityTimeLimit) : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    this.roundsCompletedTotal++;
     sessionLogger.logRound({
       miniGame: 'accountability',
       win: success,
@@ -669,11 +843,8 @@ export default class ChallengeScene extends Phaser.Scene {
 
   // ─── PRIVACY ROUND ────────────────────────────────────────────────────────────
 
-  // correctSide: 'left' | 'right' | 'none'
-  // 'none' = both are violations — student must press X with nothing toggled to pass
   getPrivacyDataPairs() {
     return [
-      // One safe + one violation — correct = left
       { left: 'Email\nAddress',         right: 'Banking\nInformation',     correctSide: 'left'  },
       { left: 'Username',               right: 'Social Security\nNumber',  correctSide: 'left'  },
       { left: 'Preferred\nLanguage',    right: 'Full Home\nAddress',       correctSide: 'left'  },
@@ -684,13 +855,11 @@ export default class ChallengeScene extends Phaser.Scene {
       { left: 'Feedback\n& Ratings',    right: 'Passwords',                correctSide: 'left'  },
       { left: 'Display\nName',          right: 'DNA\nSample',              correctSide: 'left'  },
       { left: 'Notification\nSettings', right: 'Parent Income',            correctSide: 'left'  },
-      // One safe + one violation — correct = right (sides swapped for variety)
       { left: 'Full Home\nAddress',     right: 'Username',                 correctSide: 'right' },
       { left: 'Camera\nAccess Always',  right: 'Preferred\nLanguage',      correctSide: 'right' },
       { left: 'Location Every\n5 Min',  right: 'App Usage\nHistory',       correctSide: 'right' },
       { left: 'Browsing\nHistory',      right: 'Device Type',              correctSide: 'right' },
       { left: 'Sleep Schedule',         right: 'Questions\nAsked to AI',   correctSide: 'right' },
-      // Both wrong — press X with nothing toggled to pass
       { left: 'Full Home\nAddress',     right: 'Banking\nInformation',     correctSide: 'none'  },
       { left: 'Text\nMessages',         right: 'Social Security\nNumber',  correctSide: 'none'  },
       { left: 'Microphone\nAlways On',  right: 'Camera\nAccess Always',    correctSide: 'none'  },
@@ -727,7 +896,6 @@ export default class ChallengeScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
     this.privacyPlayObjects.push(rightLabel);
 
-    // ── Toggles ──
     const toggleY = height * 0.58;
     const toggleW = 90;
     const toggleH = 42;
@@ -750,7 +918,6 @@ export default class ChallengeScene extends Phaser.Scene {
     rightZone.on('pointerdown', () => this._handlePrivacyToggleRight());
     this.privacyPlayObjects.push(rightZone);
 
-    // ── SAVE button — grey on start, green when a toggle is ON ──
     const saveCX = width  * 0.579;
     const saveCY = height * 0.760;
 
@@ -758,7 +925,6 @@ export default class ChallengeScene extends Phaser.Scene {
       .setOrigin(0.5).setDisplaySize(200, 150).setDepth(8);
     this.privacyPlayObjects.push(this.privacySaveBtn);
 
-    // ── X button — red on start, grey when a toggle is ON ──
     const xCX = width  * 0.858;
     const xCY = height * 0.192;
 
@@ -770,12 +936,11 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this._refreshPrivacyButtonState();
 
-    this.startRoundBar(this.privacyRoundTimeLimit);
-    this.resumeGlobalTimer();
+    this.startRoundBar(this.tier.privacyTimeLimit);
 
     if (this.privacyRoundTimerEvent) this.privacyRoundTimerEvent.remove(false);
     this.privacyRoundTimerEvent = this.time.delayedCall(
-      this.privacyRoundTimeLimit, () => this.finishPrivacyRound(false)
+      this.tier.privacyTimeLimit, () => this.finishPrivacyRound(false)
     );
   }
 
@@ -811,8 +976,6 @@ export default class ChallengeScene extends Phaser.Scene {
     this._refreshPrivacyButtonState();
   }
 
-  // No toggles ON  → SAVE grey (disabled) + X red (enabled)
-  // Any toggle ON  → SAVE green (enabled) + X grey (disabled)
   _refreshPrivacyButtonState() {
     const anyToggled = this.privacyToggleLeft || this.privacyToggleRight;
 
@@ -835,22 +998,15 @@ export default class ChallengeScene extends Phaser.Scene {
     }
   }
 
-  // SAVE pressed — at least one toggle is ON
   _handlePrivacySubmitSave() {
     if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
     const { correctSide } = this.privacyCurrentPair;
     let success = false;
-    if (correctSide === 'left') {
-      success = this.privacyToggleLeft && !this.privacyToggleRight;
-    } else if (correctSide === 'right') {
-      success = this.privacyToggleRight && !this.privacyToggleLeft;
-    }
-    // correctSide === 'none': any SAVE press is wrong (should have pressed X)
+    if (correctSide === 'left')  success = this.privacyToggleLeft  && !this.privacyToggleRight;
+    if (correctSide === 'right') success = this.privacyToggleRight && !this.privacyToggleLeft;
     this.finishPrivacyRound(success);
   }
 
-  // X pressed — only reachable when NO toggles are ON
-  // Pass only if the correct answer is 'none' (both options are violations)
   _handlePrivacySubmitX() {
     if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
     const success = this.privacyCurrentPair.correctSide === 'none';
@@ -860,11 +1016,12 @@ export default class ChallengeScene extends Phaser.Scene {
   finishPrivacyRound(success) {
     if (this.phase !== 'play') return;
     if (this.privacyRoundTimerEvent) this.privacyRoundTimerEvent.remove(false);
-    this.pauseGlobalTimer();
     this.stopRoundBar();
-    const earned = success ? this.winPoints : this.losePoints;
+    this.pauseGlobalTimer();
+    const earned = success ? this.calculateWinPoints(this.tier.privacyTimeLimit) : this.losePoints;
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
+    this.roundsCompletedTotal++;
     sessionLogger.logRound({
       miniGame: 'privacy',
       win: success,
@@ -942,19 +1099,45 @@ export default class ChallengeScene extends Phaser.Scene {
     }
 
     const heartY = height * 0.45;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       this.pointsUI.push(
         this.add.image(
-          width / 2 + (i - 1) * 180, heartY,
+          width / 2 + (i - 1.5) * 140, heartY,
           i < (gameState.badges ?? 0) ? 'heart_full' : 'heart_lost'
         ).setOrigin(0.5).setScale(0.45)
       );
     }
   }
 
+  // ── Counting animation for points earned this round ───────────────────────
+  animatePointsCount(textObj, targetValue, success) {
+    const duration  = 800;
+    const steps     = 30;
+    const stepDelay = duration / steps;
+    let step = 0;
+
+    const interval = setInterval(() => {
+      step++;
+      const current = Math.round((step / steps) * targetValue);
+      if (textObj.active) textObj.setText(`${current}`);
+      if (step >= steps) {
+        clearInterval(interval);
+        if (textObj.active) {
+          textObj.setText(`${targetValue}`);
+          // Small pop at the end
+          this.tweens.add({
+            targets: textObj, scaleX: 1.2, scaleY: 1.2,
+            duration: 120, yoyo: true, ease: 'Sine.Out'
+          });
+        }
+      }
+    }, stepDelay);
+  }
+
   showPointsScreen(pointsEarned, success) {
     const { width, height } = this.scale;
     this.phase = 'points';
+    //this.pauseGlobalTimer();
     this.bg.setTexture('points_bg');
     this.scaleToFit(this.bg);
 
@@ -1002,10 +1185,14 @@ export default class ChallengeScene extends Phaser.Scene {
       currentX += labelWidths[i];
     });
 
-    this.pointsUI.push(this.add.text(width / 2, height * 0.45 + 190, `${pointsEarned}`, {
-      fontSize: '64px', color: success ? '#228B22' : '#DC143C',
+    // ── Counting points number ──
+    const pointsText = this.add.text(width / 2, height * 0.45 + 190, '0', {
+      fontSize: '64px',
+      color: success ? '#228B22' : '#DC143C',
       fontFamily: 'Courier, monospace', fontStyle: 'bold'
-    }).setOrigin(0.5));
+    }).setOrigin(0.5);
+    this.pointsUI.push(pointsText);
+    this.animatePointsCount(pointsText, pointsEarned, success);
 
     this.time.delayedCall(3000, () => {
       if (this.timeRemaining <= 0) { this.showFinalResults("TIMES UP!"); return; }
@@ -1014,6 +1201,7 @@ export default class ChallengeScene extends Phaser.Scene {
         else { this.showFinalResults("ALL LIVES LOST!"); }
         return;
       }
+      this.resumeGlobalTimer();
       this.resetTimerToGameplayPosition();
       this.startNextRound();
     });
@@ -1044,7 +1232,22 @@ export default class ChallengeScene extends Phaser.Scene {
   }
 
   showBonusResultScreen(success) {
-    if (!success) { this.showFinalResults("ALL LIVES LOST!"); return; }
+    if (!success) {
+      const used = gameState.usedBonusQuestions?.length ?? 0;
+      const bonusUsed = gameState.bonusUsed ?? 0;
+
+      if (bonusUsed < 2 && used < 2) {
+        this.phase = 'bonus_popup';
+        this.pauseGlobalTimer();
+        this.clearRoundVisuals();
+        this.bg.setTexture('points_bg');
+        this.scaleToFit(this.bg);
+        this.showBonusPopupOverlay();
+      } else {
+        this.showFinalResults("ALL LIVES LOST!");
+      }
+      return;
+    }
 
     this.phase = 'points';
     this.pauseGlobalTimer();
@@ -1057,7 +1260,7 @@ export default class ChallengeScene extends Phaser.Scene {
 
     this.pointsUI.push(this.add.text(
       this.scale.width / 2, this.scale.height * 0.45 + 150, 'Bonus Life Earned!', {
-        fontSize: '44px', color: '#ffd400',
+        fontSize: '64px', color: '#ffd400',
         fontFamily: 'Courier, monospace', fontStyle: 'bold'
       }
     ).setOrigin(0.5));
@@ -1097,7 +1300,9 @@ export default class ChallengeScene extends Phaser.Scene {
         returnScene: 'ChallengeScene',
         timeRemaining: this.timeRemaining,
         score: gameState.score,
-        badges: gameState.badges
+        badges: gameState.badges,
+        currentTierIndex: this.currentTierIndex,
+        roundsCompletedTotal: this.roundsCompletedTotal,
       });
     });
 
@@ -1203,7 +1408,7 @@ export default class ChallengeScene extends Phaser.Scene {
       } else if (this.currentMiniGame === 'transparency') {
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) this.attemptTransparencyStamp();
         if (this.labelSprite) {
-          const speed = this.labelSpeed * (this.game.loop.delta / 1000);
+          const speed = this.tier.labelSpeed * (this.game.loop.delta / 1000);
           this.labelSprite.x += speed;
           if (this.labelSprite.x > this.scale.width + 140) this.labelSprite.x = -140;
         }

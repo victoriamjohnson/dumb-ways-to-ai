@@ -15,14 +15,12 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
     this.currentIndex = 0;
 
-    // Play phase objects
     this.labelSprite = null;
     this.targetBox = null;
-    this.labelSpeed = 350; // px per second
-    this.labelDirection = 1; // 1 = right, -1 = left
+    this.labelSpeed = 350;
+    this.labelDirection = 1;
     this.success = false;
 
-    // Comment text objects to clean up
     this.commentObjects = [];
   }
 
@@ -40,15 +38,10 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#000814');
 
-    // ----- BACKGROUND -----
     const bg = this.add.image(centerX, centerY, 'dt_training_bg').setOrigin(0.5);
-    const scaleX = width / bg.width;
-    const scaleY = height / bg.height;
-    const scale = Math.min(scaleX, scaleY);
-    bg.setScale(scale);
+    bg.setScale(Math.min(width / bg.width, height / bg.height));
     this.bg = bg;
 
-    // ----- DIALOGUE TEXT -----
     const textLeftX = width * 0.10;
     const speakerY  = height * 0.65;
     const bodyY     = height * 0.70;
@@ -76,72 +69,73 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       }
     ).setOrigin(0.5);
 
-    // ----- DIALOGUE CONTENT -----
+    // ---------- DIALOGUE ----------
+
     const { firstName } = gameState.player;
 
     this.introSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Developer Doom is at it again, Developer${firstName ? ` ${firstName}` : ''}.`
+        text: `Doom built DevDoomTube — a platform where AI posts comments using real users' names, Developer${firstName ? ` ${firstName}` : ''}.`
       },
       {
         speaker: 'Dr. Bot',
-        text: `He built DevDoomTube — a video platform with AI features that post using real users' names.`
+        text: 'No labels. No warnings. Users have no idea AI is acting on their behalf.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `No warnings. No labels. Users have no idea AI is even involved.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Responsible developers label AI features so users always know what's AI and what's not.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Your job: stamp the "AI Feature" label onto the target box before it slides past!`
+        text: 'Responsible developers always make it clear when AI is involved. Stamp the label before it slides past.'
       }
     ];
 
     this.resultStepsSuccess = [
       {
         speaker: 'Dr. Bot',
-        text: `That's how it's done. The AI feature is clearly labeled now.`
+        text: '✓ CORRECT!',
+        color: '#00ff88'
       },
       {
         speaker: 'Dr. Bot',
-        text: `Users deserve to know when AI is involved — no exceptions.`
+        text: 'The AI feature is clearly labeled now.'
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: 'Users deserve to know when AI is involved — no exceptions.'
       }
     ];
 
     this.resultStepsFail = [
       {
         speaker: 'Dr. Bot',
-        text: `Missed it. The AI feature went unlabeled — just like Doom planned.`
+        text: '✗ INCORRECT!',
+        color: '#ff4444'
       },
       {
         speaker: 'Dr. Bot',
-        text: `When AI isn't labeled, users lose the ability to make informed choices.`
+        text: 'The AI feature went unlabeled — just like Doom planned.'
+      },
+      {
+        speaker: 'Dr. Bot',
+        text: 'When AI isn\'t labeled, users lose the ability to make informed choices.'
       }
     ];
 
     this.reflectionSteps = [
       {
         speaker: 'Dr. Bot',
-        text: `Transparency means users should always know when AI is involved.`
+        text: 'Transparency means users should always know when AI is involved.'
       },
       {
         speaker: 'Dr. Bot',
-        text: `If users can't tell what's AI and what's real — that's a dumb way to AI.`
+        text: 'If users can\'t tell what\'s AI and what\'s real — that\'s a Dumb Way to AI.'
       }
     ];
 
     this.phase = 'intro';
     this.currentIndex = 0;
 
-    // Space key handled in update() so it works during play phase too
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Click advances dialogue (but not during play — clicking during play does nothing)
     this.input.on('pointerdown', () => {
       if (this.phase !== 'play') this.handleAdvance();
     });
@@ -154,10 +148,8 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
   showIntroStep() {
     const step = this.introSteps[this.currentIndex];
-    if (!step) {
-      this.showInstructions();
-      return;
-    }
+    if (!step) { this.showInstructions(); return; }
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
     this.hintText.setText('Press SPACE or click to continue');
@@ -165,12 +157,12 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
   showInstructions() {
     this.phase = 'instructions';
+    this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
       'LABEL THE AI FEATURE!\n\n' +
       'The "AI Feature" label will slide across the screen.\n' +
-      'Press SPACE when it lines up with the target box.\n' +
-      'Take your shot when it lines up!'
+      'Press SPACE when it lines up with the target box.'
     );
     this.hintText.setText('Press SPACE or click to begin');
   }
@@ -196,6 +188,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
         const step = steps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor(step.color || '#ffffff');
       }
 
     } else if (this.phase === 'reflection') {
@@ -206,6 +199,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
         const step = this.reflectionSteps[this.currentIndex];
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
+        this.bodyText.setColor('#ffffff');
       }
     }
   }
@@ -217,28 +211,21 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
     this.phase = 'play';
 
-    // Swap to game background
     this.bg.setTexture('dt_game_bg');
 
-    // Hide dialogue UI during gameplay
     this.speakerText.setVisible(false);
     this.bodyText.setVisible(false);
     this.hintText.setVisible(false);
 
-    // Draw comments in the grey sidebar
     this.drawSidebarComments();
 
-    // ── Target box ──
     const targetX = width * 0.815;
     const targetY = height * 0.78;
-    const targetW = 260;
-    const targetH = 100;
 
-    this.targetBox = this.add.rectangle(targetX, targetY, targetW, targetH, 0xffffff, 0)
+    this.targetBox = this.add.rectangle(targetX, targetY, 260, 100, 0xffffff, 0)
       .setStrokeStyle(4, 0xff00ff, 1)
       .setDepth(5);
 
-    // ── AI Feature Label ──
     this.labelSprite = this.add.image(-140, targetY, 'ai_feature_label')
       .setOrigin(0.5)
       .setDisplaySize(200, 100)
@@ -254,15 +241,15 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     this.commentObjects = [];
 
     const { firstName } = gameState.player;
-    const name = firstName ? firstName : 'Developer';
+    const name = firstName || 'Developer';
 
-    const usernamePositions = [
+    const positions = [
       { x: width * 0.635, y: height * 0.375 },
-      { x: width * 0.635, y: height * 0.54 },
-      { x: width * 0.635, y: height * 0.7 },
+      { x: width * 0.635, y: height * 0.54  },
+      { x: width * 0.635, y: height * 0.7   },
     ];
 
-    usernamePositions.forEach((pos) => {
+    positions.forEach(pos => {
       const userText = this.add.text(pos.x, pos.y, `Dev ${name}`, {
         fontSize: '25px',
         color: '#000000',
@@ -282,18 +269,8 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
   attemptStamp() {
     if (this.phase !== 'play') return;
 
-    const lx = this.labelSprite.x;
-    const ly = this.labelSprite.y;
-    const lw = 250 / 2;
-    const lh = 150 / 2;
-
-    const tx = this.targetBox.x;
-    const ty = this.targetBox.y;
-    const tw = this.targetBox.width / 2;
-    const th = this.targetBox.height / 2;
-
-    const overlapX = Math.abs(lx - tx) < (lw + tw) * 0.55;
-    const overlapY = Math.abs(ly - ty) < (lh + th) * 0.55;
+    const overlapX = Math.abs(this.labelSprite.x - this.targetBox.x) < (125 + 130) * 0.55;
+    const overlapY = Math.abs(this.labelSprite.y - this.targetBox.y) < (75  + 50 ) * 0.55;
 
     this.endRound(overlapX && overlapY);
   }
@@ -301,17 +278,15 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
   endRound(success) {
     if (this.phase !== 'play') return;
     this.phase = 'ended_round';
-
     this.success = success;
     sessionLogger.logTutorialMiniGameEnd('transparency', this.success);
-
     this.cleanupPlayVisuals();
     this.showResultPhase();
   }
 
   cleanupPlayVisuals() {
     if (this.labelSprite) { this.labelSprite.destroy(); this.labelSprite = null; }
-    if (this.targetBox)   { this.targetBox.destroy();   this.targetBox = null; }
+    if (this.targetBox)   { this.targetBox.destroy();   this.targetBox = null;   }
     this.commentObjects.forEach(obj => obj.destroy());
     this.commentObjects = [];
   }
@@ -330,21 +305,21 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
     this.speakerText.setText(steps[0].speaker);
     this.bodyText.setText(steps[0].text);
+    this.bodyText.setColor(steps[0].color || '#ffffff');
   }
 
   startReflectionPhase() {
     this.phase = 'reflection';
     this.currentIndex = 0;
-
+    this.bodyText.setColor('#ffffff');
     this.bg.setTexture('dt_training_bg');
-
     const step = this.reflectionSteps[0];
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
     this.hintText.setText('Press SPACE or click to continue');
   }
 
-  // ─── UPDATE LOOP ─────────────────────────────────────────────────────────────
+  // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update(time, delta) {
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
@@ -355,16 +330,11 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       }
     }
 
-    // Move label only during play phase
     if (this.phase !== 'play' || !this.labelSprite) return;
 
-    const { width } = this.scale;
-    const speed = this.labelSpeed * (delta / 1000);
+    this.labelSprite.x += this.labelSpeed * (delta / 1000) * this.labelDirection;
 
-    this.labelSprite.x += speed * this.labelDirection;
-
-    // Wrap back to left when it exits the right edge
-    if (this.labelSprite.x > width + 140) {
+    if (this.labelSprite.x > this.scale.width + 140) {
       this.labelSprite.x = -140;
     }
   }
