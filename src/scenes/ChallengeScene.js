@@ -929,7 +929,7 @@ export default class ChallengeScene extends Phaser.Scene {
     const xCY = height * 0.192;
 
     this.privacyXBtn = this.add.image(xCX, xCY, 'pr_btn_x')
-      .setOrigin(0.5).setDisplaySize(100, 100).setDepth(8)
+      .setOrigin(0.5).setDisplaySize(120, 120).setDepth(8)
       .setInteractive({ useHandCursor: true });
     this.privacyXBtn.on('pointerdown', () => this._handlePrivacySubmitX());
     this.privacyPlayObjects.push(this.privacyXBtn);

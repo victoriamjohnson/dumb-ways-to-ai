@@ -12,6 +12,10 @@ export default class TutorialStoryScene extends Phaser.Scene {
     this.load.image('tutorial_bg', 'assets/ui/Tutorial_Screen.png');
   }
 
+  init(data) {
+    this.outroMode = !!(data && data.outroMode);
+  }
+
   create() {
     const { width, height } = this.scale;
     const centerX = width / 2;
@@ -59,12 +63,10 @@ export default class TutorialStoryScene extends Phaser.Scene {
 
     this.mode = 'dialogue';
 
-    // ----- CHECK FOR OUTRO MODE -----
-    const data = this.scene.settings.data;
-    const isOutro = data && data.outroMode;
+    // ----- INTRO VS OUTRO -----
+    const isOutro = this.outroMode;
 
     if (isOutro) {
-      // Outro dialogue shown after all 4 tutorial microgames are complete
       this.dialogue = [
         {
           speaker: 'Dr. Bot',
@@ -88,12 +90,11 @@ export default class TutorialStoryScene extends Phaser.Scene {
         }
       ];
     } else {
-      // Intro dialogue shown at the start of the tutorial
       this.dialogue = [
         { speaker: 'Dr. Bot', text: 'Welcome to ResponsibleCity AI Labs.' },
         { speaker: 'Dr. Bot', text: 'One coder, Developer Doom, keeps shipping reckless AI — and the city is paying for it.' },
         { speaker: 'Dr. Bot', text: `That's where you come in, Developer${firstName ? ` ${firstName}` : ''}.` },
-        { speaker: 'Dr. Bot', text: 'Your job: counter Doom\'s bad designs and earn the title Certified Responsible Developer.' },
+        { speaker: 'Dr. Bot', text: 'Your job: Counter Developer Doom\'s bad designs and earn the title Certified Responsible Developer.' },
         { type: 'principles' },
         { speaker: 'Dr. Bot', text: 'Let\'s begin your training.' }
       ];
@@ -104,12 +105,7 @@ export default class TutorialStoryScene extends Phaser.Scene {
     this.input.keyboard.on('keyup-SPACE', () => this.advanceDialogue());
     this.input.on('pointerdown', () => this.advanceDialogue());
 
-    // log differently depending on intro vs outro
-    if (isOutro) {
-      sessionLogger.logTutorialComplete();
-    } else {
-      sessionLogger.logTutorialStart();
-    }
+    sessionLogger.logTutorialStart();
 
     this.showCurrentStep();
   }
@@ -164,7 +160,6 @@ export default class TutorialStoryScene extends Phaser.Scene {
       return;
     }
 
-    // Back to normal dialogue
     this.mode = 'dialogue';
 
     if (this.principlesTitle) { this.principlesTitle.destroy(); this.principlesTitle = null; }
@@ -183,14 +178,9 @@ export default class TutorialStoryScene extends Phaser.Scene {
   }
 
   endDialogue() {
-    const data = this.scene.settings.data;
-    const isOutro = data && data.outroMode;
-
-    if (isOutro) {
-      // After outro, send student back to HomeScene to choose Challenge Mode
+    if (this.outroMode) {
       this.scene.start('HomeScene');
     } else {
-      // After intro, start the first tutorial microgame
       this.scene.start('FairnessTutorialScene');
     }
   }

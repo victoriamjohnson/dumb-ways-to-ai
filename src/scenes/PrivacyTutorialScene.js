@@ -165,7 +165,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
       'PROTECT USER PRIVACY!\n\n' +
-      'Two data types are shown. Toggle ON the one that is safe to collect,\n' +
+      'Two data types are shown. Toggle ON data that is safe to collect,\n' +
       'then press SAVE to submit.\n' +
       'If neither is safe, toggle nothing and press the X button.'
     );
