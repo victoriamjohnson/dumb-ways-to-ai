@@ -6,6 +6,8 @@ An educational browser-based game teaching 8th graders about the principles
 of Responsible AI through fast-paced, WarioWare-style microgames.
 
 🎮 **Play here:** https://victoriamjohnson.github.io/dumb-ways-to-ai/
+ **Pre:** [https://victoriamjohnson.github.io/dumb-ways-to-ai/](https://utsa.az1.qualtrics.com/jfe/form/SV_6YEv56tB4sAUU98)
+ **Post:** [https://victoriamjohnson.github.io/dumb-ways-to-ai/](https://utsa.az1.qualtrics.com/jfe/form/SV_6yxOS9gaDdWoSA6)
 
 ---
 
