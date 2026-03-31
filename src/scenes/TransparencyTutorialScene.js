@@ -2,26 +2,27 @@
 import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
+const AUTO_ADVANCE_MS = 8000;
+
 export default class TransparencyTutorialScene extends Phaser.Scene {
   constructor() {
     super('TransparencyTutorialScene');
 
-    this.phase = 'intro'; // intro, instructions, play, result, reflection
-
+    this.phase = 'intro';
     this.introSteps = [];
     this.resultStepsSuccess = [];
     this.resultStepsFail = [];
     this.reflectionSteps = [];
-
     this.currentIndex = 0;
-
     this.labelSprite = null;
     this.targetBox = null;
     this.labelSpeed = 350;
     this.labelDirection = 1;
     this.success = false;
-
     this.commentObjects = [];
+    this._autoTimer = null;
+    this._countdownEvent = null;
+    this._secondsLeft = 0;
   }
 
   preload() {
@@ -47,106 +48,118 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const bodyY     = height * 0.70;
 
     this.speakerText = this.add.text(textLeftX, speakerY, '', {
-      fontSize: '26px',
-      color: '#ffd166',
-      fontFamily: 'Courier, monospace',
-      fontStyle: 'bold'
+      fontSize: '26px', color: '#ffd166',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold'
     }).setOrigin(0, 0.5);
 
     this.bodyText = this.add.text(textLeftX, bodyY, '', {
-      fontSize: '26px',
-      color: '#ffffff',
-      fontFamily: 'Courier, monospace',
-      wordWrap: { width: width * 0.84 }
+      fontSize: '26px', color: '#ffffff',
+      fontFamily: 'Courier, monospace', wordWrap: { width: width * 0.84 }
     }).setOrigin(0, 0);
 
     this.hintText = this.add.text(centerX, height - 55,
-      'Press SPACE or click to continue', {
-        fontSize: '20px',
-        color: '#aaaaaa',
-        fontFamily: 'Courier, monospace',
-        align: 'center'
+      '← Back   Continue →', {
+        fontSize: '20px', color: '#aaaaaa',
+        fontFamily: 'Courier, monospace', align: 'center'
       }
     ).setOrigin(0.5);
 
-    // ---------- DIALOGUE ----------
+    // ── Countdown text (bottom-right) ──
+    this.countdownText = this.add.text(width - 115, height - 55, '', {
+      fontSize: '30px', color: '#ffd166', fontFamily: 'Courier, monospace'
+    }).setOrigin(1, 0.5);
 
     const { firstName } = gameState.player;
     const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     this.introSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, Developer Doom is at it again and this one is sneaky!\nHe built a platform called DevDoomTube.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, DevDoomTube has an AI feature that posts comments using real users' names.\nNo labels. No warnings. Users have no idea AI is acting on their behalf!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, this is a textbook Dumb Ways to AI move.\nResponsible developers always make it clear when AI is involved.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, your job is to stamp the AI Feature label onto the comments section.\nGet it lined up before it slides past!`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, Doom built DevDoomTube, an AI that posts comments using real users' names.` },
+      { speaker: 'Dr. Bot', text: `No labels. No warnings. Classic Dumb Ways to AI!` },
+      { speaker: 'Dr. Bot', text: `Responsible developers always make it clear when AI is involved.\nStamp the label before it slides past!` }
     ];
 
     this.resultStepsSuccess = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✓ CORRECT!',
-        color: '#00ff88'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, the AI feature is clearly labeled now!\nThat is how responsible developers do it.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Users deserve to know when AI is involved.\nNo exceptions. Not even for Doom!`
-      }
+      { speaker: 'Dr. Bot', text: '✓ CORRECT!', color: '#00ff88' },
+      { speaker: 'Dr. Bot', text: `${dev}, the AI feature is labeled and users are informed.\nThat is transparency in action!` }
     ];
 
     this.resultStepsFail = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✗ INCORRECT!',
-        color: '#ff4444'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, the AI feature went unlabeled.\nJust like Doom planned. Classic Dumb Ways to AI!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `When AI is not labeled, users lose the ability to make informed choices.\nThat is not okay!`
-      }
+      { speaker: 'Dr. Bot', text: '✗ INCORRECT!', color: '#ff4444' },
+      { speaker: 'Dr. Bot', text: `${dev}, the AI went unlabeled, just like Doom planned.\nWhen AI is hidden, users cannot make informed choices.` }
     ];
 
     this.reflectionSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, transparency means users should always know when AI is involved.\nAlways. No hiding it!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, if users cannot tell what is AI and what is real, that is a Dumb Way to AI.\nDon't be like Doom.`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, if users cannot tell what is AI and what is real, that is a Dumb Way to AI.` },
+      { speaker: 'Dr. Bot', text: `Always label it. No exceptions!` }
     ];
 
     this.phase = 'intro';
     this.currentIndex = 0;
 
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-    this.input.on('pointerdown', () => {
+    this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.input.on('pointerdown', (pointer, targets) => {
+      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
       if (this.phase !== 'play') this.handleAdvance();
     });
 
     sessionLogger.logTutorialMiniGameStart('transparency');
     this.showIntroStep();
+  }
+
+  // ─── AUTO-ADVANCE TIMER ───────────────────────────────────────────────────────
+
+  startAutoAdvanceTimer() {
+    this.clearAutoAdvanceTimer();
+    this._secondsLeft = Math.ceil(AUTO_ADVANCE_MS / 1000);
+    this.updateCountdown();
+
+    this._countdownEvent = this.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => { this._secondsLeft--; this.updateCountdown(); }
+    });
+
+    this._autoTimer = this.time.delayedCall(AUTO_ADVANCE_MS, () => this.handleAdvance());
+  }
+
+  clearAutoAdvanceTimer() {
+    if (this._autoTimer)      { this._autoTimer.remove(false);      this._autoTimer = null; }
+    if (this._countdownEvent) { this._countdownEvent.remove(false); this._countdownEvent = null; }
+    if (this.countdownText)   { this.countdownText.setText(''); }
+  }
+
+  updateCountdown() {
+    if (this.countdownText) {
+      this.countdownText.setText(this._secondsLeft > 0 ? `${this._secondsLeft}` : '');
+    }
+  }
+
+  // ─── BACK ─────────────────────────────────────────────────────────────────────
+
+  handleBack() {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex--;
+    this.refreshCurrentPhaseStep();
+  }
+
+  refreshCurrentPhaseStep() {
+    if (this.phase === 'intro') {
+      this.showIntroStep();
+    } else if (this.phase === 'result') {
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      const step = steps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor(step.color || '#ffffff');
+      this.startAutoAdvanceTimer();
+    } else if (this.phase === 'reflection') {
+      const step = this.reflectionSteps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor('#ffffff');
+      this.startAutoAdvanceTimer();
+    }
   }
 
   // ─── INTRO & INSTRUCTIONS ────────────────────────────────────────────────────
@@ -157,10 +170,12 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   showInstructions() {
+    this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
@@ -169,10 +184,14 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
       'The "AI Feature" label will slide across the screen.\n' +
       'Press SPACE when it lines up with the target box.'
     );
-    this.hintText.setText('Press SPACE or click to begin');
+    this.hintText.setText('Begin →');
   }
 
   handleAdvance() {
+    if (this.phase === 'play') return;
+
+    this.clearAutoAdvanceTimer();
+
     if (this.phase === 'intro') {
       this.currentIndex++;
       if (this.currentIndex >= this.introSteps.length) {
@@ -194,6 +213,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor(step.color || '#ffffff');
+        this.startAutoAdvanceTimer();
       }
 
     } else if (this.phase === 'reflection') {
@@ -205,6 +225,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor('#ffffff');
+        this.startAutoAdvanceTimer();
       }
     }
   }
@@ -215,12 +236,11 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.phase = 'play';
-
     this.bg.setTexture('dt_game_bg');
-
     this.speakerText.setVisible(false);
     this.bodyText.setVisible(false);
     this.hintText.setVisible(false);
+    this.countdownText.setText('');
 
     this.drawSidebarComments();
 
@@ -228,20 +248,16 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const targetY = height * 0.78;
 
     this.targetBox = this.add.rectangle(targetX, targetY, 260, 100, 0xffffff, 0)
-      .setStrokeStyle(4, 0xff00ff, 1)
-      .setDepth(5);
+      .setStrokeStyle(4, 0xff00ff, 1).setDepth(5);
 
     this.labelSprite = this.add.image(-140, targetY, 'ai_feature_label')
-      .setOrigin(0.5)
-      .setDisplaySize(200, 100)
-      .setDepth(10);
+      .setOrigin(0.5).setDisplaySize(200, 100).setDepth(10);
 
     this.labelDirection = 1;
   }
 
   drawSidebarComments() {
     const { width, height } = this.scale;
-
     this.commentObjects.forEach(obj => obj.destroy());
     this.commentObjects = [];
 
@@ -256,10 +272,8 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
     positions.forEach(pos => {
       const userText = this.add.text(pos.x, pos.y, `Dev ${name}`, {
-        fontSize: '25px',
-        color: '#000000',
-        fontFamily: 'Courier, monospace',
-        fontStyle: 'bold'
+        fontSize: '25px', color: '#000000',
+        fontFamily: 'Courier, monospace', fontStyle: 'bold'
       }).setOrigin(0, 0).setDepth(10);
 
       const maxW = width * 0.18;
@@ -273,10 +287,8 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
   attemptStamp() {
     if (this.phase !== 'play') return;
-
     const overlapX = Math.abs(this.labelSprite.x - this.targetBox.x) < (125 + 130) * 0.55;
     const overlapY = Math.abs(this.labelSprite.y - this.targetBox.y) < (75  + 50 ) * 0.55;
-
     this.endRound(overlapX && overlapY);
   }
 
@@ -291,7 +303,7 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
 
   cleanupPlayVisuals() {
     if (this.labelSprite) { this.labelSprite.destroy(); this.labelSprite = null; }
-    if (this.targetBox)   { this.targetBox.destroy();   this.targetBox = null;   }
+    if (this.targetBox)   { this.targetBox.destroy();   this.targetBox = null; }
     this.commentObjects.forEach(obj => obj.destroy());
     this.commentObjects = [];
   }
@@ -299,18 +311,17 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
   showResultPhase() {
     this.phase = 'result';
     this.currentIndex = 0;
-
     this.bg.setTexture(this.success ? 'dt_training_bg' : 'dt_training_bg_fail');
-
     this.speakerText.setVisible(true);
     this.bodyText.setVisible(true);
     this.hintText.setVisible(true);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
 
     const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
     this.speakerText.setText(steps[0].speaker);
     this.bodyText.setText(steps[0].text);
     this.bodyText.setColor(steps[0].color || '#ffffff');
+    this.startAutoAdvanceTimer();
   }
 
   startReflectionPhase() {
@@ -321,26 +332,24 @@ export default class TransparencyTutorialScene extends Phaser.Scene {
     const step = this.reflectionSteps[0];
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update(time, delta) {
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      if (this.phase === 'play') {
-        this.attemptStamp();
-      } else {
-        this.handleAdvance();
-      }
+      if (this.phase === 'play') this.attemptStamp();
+      else this.handleAdvance();
+    }
+    if (this.phase !== 'play') {
+      if (Phaser.Input.Keyboard.JustDown(this.rightKey)) this.handleAdvance();
+      if (Phaser.Input.Keyboard.JustDown(this.leftKey))  this.handleBack();
     }
 
     if (this.phase !== 'play' || !this.labelSprite) return;
-
     this.labelSprite.x += this.labelSpeed * (delta / 1000) * this.labelDirection;
-
-    if (this.labelSprite.x > this.scale.width + 140) {
-      this.labelSprite.x = -140;
-    }
+    if (this.labelSprite.x > this.scale.width + 140) this.labelSprite.x = -140;
   }
 }

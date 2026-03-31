@@ -33,7 +33,7 @@ export default class BonusQuestionScene extends Phaser.Scene {
         incorrectFeedback: 'The correct answer is B — the developer.\nWhen AI causes harm, the humans who built and deployed it are responsible.'
       },
       {
-        question: 'Developer Doom trains an AI to recommend students for advanced\nclasses using data from only one school in one neighborhood.\nWhat is most likely to happen?',
+        question: 'An AI that recommends students for advanced classes is using data from only one school in one neighborhood.\nWhat is most likely to happen?',
         options: {
           A: 'The AI will figure out how to be fair on its own',
           B: 'The AI will ask for more data before making decisions',
@@ -267,13 +267,13 @@ export default class BonusQuestionScene extends Phaser.Scene {
       gameState.score  = this.score;
 
       this.scene.start(this.returnScene, {
-        resumeRun:         true,
-        fromBonusQuestion: true,
-        bonusCorrect:      true,
-        timeRemaining:     this.timeRemaining,
-        score:             gameState.score,
-        badges:            gameState.badges
-      });
+      resumeRun:         true,
+      fromBonusQuestion: true,
+      bonusCorrect:      true,   // ← was incorrectly set to false
+      timeRemaining:     this.timeRemaining,
+      score:             gameState.score,
+      badges:            gameState.badges
+    });
 
     } else {
       // Wrong: badges drop to 0, check if another attempt is available

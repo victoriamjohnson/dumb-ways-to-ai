@@ -3,6 +3,8 @@
 import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
+const AUTO_ADVANCE_MS = 8000;
+
 export default class TutorialStoryScene extends Phaser.Scene {
   constructor() {
     super('TutorialStoryScene');
@@ -13,7 +15,6 @@ export default class TutorialStoryScene extends Phaser.Scene {
   }
 
   init(data) {
-    // Only treat as outro if explicitly passed — fixes the replay bug
     this.outroMode = data === true || (data && data.outroMode === true);
   }
 
@@ -24,14 +25,12 @@ export default class TutorialStoryScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#000814');
 
-    // ----- BACKGROUND -----
     const bg = this.add.image(centerX, centerY, 'tutorial_bg').setOrigin(0.5);
     bg.setScale(Math.min(width / bg.width, height / bg.height));
 
     const { firstName } = gameState.player;
     const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
-    // ----- DIALOG BOX TEXT -----
     const textLeftX = width * 0.12;
     const speakerY  = height * 0.65;
     const bodyY     = height * 0.70;
@@ -39,95 +38,107 @@ export default class TutorialStoryScene extends Phaser.Scene {
     this.dialogueBox = bg;
 
     this.speakerText = this.add.text(textLeftX, speakerY, '', {
-      fontSize: '26px',
-      color: '#ffd166',
-      fontFamily: 'Courier, monospace',
-      fontStyle: 'bold'
+      fontSize: '26px', color: '#ffd166',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold'
     }).setOrigin(0, 0.5);
 
     this.bodyText = this.add.text(textLeftX, bodyY, '', {
-      fontSize: '26px',
-      color: '#ffffff',
-      fontFamily: 'Courier, monospace',
-      wordWrap: { width: width * 0.76 }
+      fontSize: '26px', color: '#ffffff',
+      fontFamily: 'Courier, monospace', wordWrap: { width: width * 0.76 }
     }).setOrigin(0, 0);
 
-    this.hintText = this.add.text(
-      centerX,
-      height - 55,
-      'Press SPACE or click to continue',
-      {
-        fontSize: '20px',
-        color: '#aaaaaa',
-        fontFamily: 'Courier, monospace'
+    this.hintText = this.add.text(centerX, height - 55,
+      '← Back   Continue →', {
+        fontSize: '20px', color: '#aaaaaa', fontFamily: 'Courier, monospace'
       }
     ).setOrigin(0.5);
 
-    this.mode = 'dialogue';
+    // ── Countdown text (bottom-right) ──
+    this.countdownText = this.add.text(width - 115, height - 55, '', {
+      fontSize: '30px', color: '#ffd166', fontFamily: 'Courier, monospace'
+    }).setOrigin(1, 0.5);
 
-    // ----- INTRO VS OUTRO -----
+    this.mode = 'dialogue';
+    this._autoTimer = null;
+    this._countdownEvent = null;
+    this._secondsLeft = 0;
+
     if (this.outroMode) {
       this.dialogue = [
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, you did it!\nTutorial complete!`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, you have seen what Developer Doom's bad decisions look like.\nAnd more importantly, you know how to fix them.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `Now it is time for the REAL test!\nThe city's AI systems are going live in 2 minutes.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `No explanations. No hand-holding. Just you and the clock.\nNo pressure... okay, a little pressure.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, head to Challenge Mode when you are ready.\nThe city is counting on you. Good luck!`
-        }
+        { speaker: 'Dr. Bot', text: `${dev}, tutorial complete!\nNow let's see how you do under pressure.` },
+        { speaker: 'Dr. Bot', text: `The city's AI systems go live in 2 minutes.\nNo explanations. Just you and the clock.` },
+        { speaker: 'Dr. Bot', text: `Head to Challenge Mode when you are ready.\nGood luck!` }
       ];
     } else {
       this.dialogue = [
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, welcome to ResponsibleCity AI Labs!\nWe are very glad you are here.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, I will be honest with you.\nOne coder named Developer Doom keeps shipping reckless AI and the city is paying for it.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, that is where YOU come in!\nYour job: counter Doom's bad designs and earn the title Certified Responsible Developer.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, to do that you will need to master 4 Principles of Responsible AI.\nThink of them as your superpowers.`
-        },
+        { speaker: 'Dr. Bot', text: `${dev}, welcome to ResponsibleCity AI Labs!` },
+        { speaker: 'Dr. Bot', text: `Developer Doom keeps shipping reckless AI, and the city is paying for it.` },
+        { speaker: 'Dr. Bot', text: `Your job: Counter Doom's bad designs and earn the title Certified Responsible Developer.` },
         { type: 'principles' },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, learn these well!\nThe city thrives when you use them. It glitches when you don't.`
-        },
-        {
-          speaker: 'Dr. Bot',
-          text: `${dev}, let's begin your training.\nTry to keep up!`
-        }
+        { speaker: 'Dr. Bot', text: `${dev}, use these well.\nThe city thrives when you do. Let's begin!` }
       ];
     }
 
     this.currentIndex = 0;
 
-    this.input.keyboard.on('keyup-SPACE', () => this.advanceDialogue());
-    this.input.on('pointerdown', () => this.advanceDialogue());
+    this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.input.on('pointerdown', (pointer, targets) => {
+      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
+      if (this.phase !== 'play') this.handleAdvance();
+    });
 
     sessionLogger.logTutorialStart();
+    this.showCurrentStep();
 
+  }
+
+  update() {
+    if (Phaser.Input.Keyboard.JustDown(this.rightKey)) this.advanceDialogue();
+    if (Phaser.Input.Keyboard.JustDown(this.leftKey))  this.handleBack();
+  }
+
+  // ─── AUTO-ADVANCE TIMER ───────────────────────────────────────────────────────
+
+  startAutoAdvanceTimer() {
+    this.clearAutoAdvanceTimer();
+    this._secondsLeft = Math.ceil(AUTO_ADVANCE_MS / 1000);
+    this.updateCountdown();
+
+    this._countdownEvent = this.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => {
+        this._secondsLeft--;
+        this.updateCountdown();
+      }
+    });
+
+    this._autoTimer = this.time.delayedCall(AUTO_ADVANCE_MS, () => {
+      this.advanceDialogue();
+    });
+  }
+
+  clearAutoAdvanceTimer() {
+    if (this._autoTimer)      { this._autoTimer.remove(false);      this._autoTimer = null; }
+    if (this._countdownEvent) { this._countdownEvent.remove(false); this._countdownEvent = null; }
+    if (this.countdownText)   { this.countdownText.setText(''); }
+  }
+
+  updateCountdown() {
+    if (this.countdownText) {
+      this.countdownText.setText(this._secondsLeft > 0 ? `${this._secondsLeft}` : '');
+    }
+  }
+
+  // ─── BACK ─────────────────────────────────────────────────────────────────────
+
+  handleBack() {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex--;
     this.showCurrentStep();
   }
+
+  // ─── DIALOGUE ─────────────────────────────────────────────────────────────────
 
   showCurrentStep() {
     const { width, height } = this.scale;
@@ -135,6 +146,7 @@ export default class TutorialStoryScene extends Phaser.Scene {
     const centerY = height / 2;
 
     if (this.currentIndex >= this.dialogue.length) {
+      this.clearAutoAdvanceTimer();
       this.endDialogue();
       return;
     }
@@ -143,55 +155,42 @@ export default class TutorialStoryScene extends Phaser.Scene {
 
     if (step.type === 'principles') {
       this.mode = 'principles';
-
       this.speakerText.setVisible(false);
       this.bodyText.setVisible(false);
 
       if (this.principlesTitle) this.principlesTitle.destroy();
       if (this.principlesList)  this.principlesList.destroy();
 
-      this.principlesTitle = this.add.text(
-        centerX,
-        centerY + 120,
-        'The 4 Responsible AI Principles',
-        {
-          fontSize: '32px',
-          color: '#ffffff',
-          fontFamily: 'Courier, monospace',
-          fontStyle: 'bold',
-          align: 'center'
+      this.principlesTitle = this.add.text(centerX, centerY + 120,
+        'The 4 Responsible AI Principles', {
+          fontSize: '32px', color: '#ffffff',
+          fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
         }
       ).setOrigin(0.5);
 
-      this.principlesList = this.add.text(
-        centerX,
-        centerY + 210,
-        '• Be Fair\n• Be Transparent\n• Protect Privacy\n• Take Accountability',
-        {
-          fontSize: '26px',
-          color: '#ffd166',
-          fontFamily: 'Courier, monospace',
-          align: 'center'
+      this.principlesList = this.add.text(centerX, centerY + 210,
+        '• Be Fair\n• Be Transparent\n• Protect Privacy\n• Take Accountability', {
+          fontSize: '26px', color: '#ffd166',
+          fontFamily: 'Courier, monospace', align: 'center'
         }
       ).setOrigin(0.5);
 
-      this.hintText.setText('Press SPACE or click to continue');
+      this.hintText.setText('← Back   Continue →');
+      this.startAutoAdvanceTimer();
       return;
     }
 
     this.mode = 'dialogue';
-
     if (this.principlesTitle) { this.principlesTitle.destroy(); this.principlesTitle = null; }
     if (this.principlesList)  { this.principlesList.destroy();  this.principlesList  = null; }
 
-    this.speakerText.setVisible(true);
-    this.bodyText.setVisible(true);
-
-    this.speakerText.setText(step.speaker || '');
-    this.bodyText.setText(step.text || '');
+    this.speakerText.setVisible(true).setText(step.speaker || '');
+    this.bodyText.setVisible(true).setText(step.text || '');
+    this.startAutoAdvanceTimer();
   }
 
   advanceDialogue() {
+    this.clearAutoAdvanceTimer();
     this.currentIndex += 1;
     this.showCurrentStep();
   }

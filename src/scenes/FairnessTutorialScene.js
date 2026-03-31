@@ -3,33 +3,34 @@
 import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
+const AUTO_ADVANCE_MS = 8000;
+
 export default class FairnessTutorialScene extends Phaser.Scene {
   constructor() {
     super('FairnessTutorialScene');
 
-    this.phase = 'intro'; // intro, instructions, play, result, reflection
-
+    this.phase = 'intro';
     this.introSteps = [];
     this.resultStepsSuccess = [];
     this.resultStepsFail = [];
     this.reflectionSteps = [];
-
     this.currentIndex = 0;
-
-    // { sprite, type: 'boy' | 'girl', alive, row, col, textureKey, deletedTextureKey }
     this.players = [];
     this.boyCount = 0;
     this.girlCount = 0;
+    this._autoTimer = null;
+    this._countdownEvent = null;
+    this._secondsLeft = 0;
   }
 
   preload() {
-    this.load.image('fairness_intro_bg',       'assets/ui/Basketball_Training_Screen.png');
-    this.load.image('fairness_intro_bg_fail',  'assets/ui/Basketball_Training_Screen_Fail.png');
-    this.load.image('fairness_play_bg',        'assets/ui/Basketball_Game_Screen.png');
-    this.load.image('player_boy',              'assets/ui/Boy_Player.png');
-    this.load.image('player_girl',             'assets/ui/Girl_Player.png');
-    this.load.image('player_boy_deleted',      'assets/ui/Boy_Player_Deleted.png');
-    this.load.image('player_girl_deleted',     'assets/ui/Girl_Player_Deleted.png');
+    this.load.image('fairness_intro_bg',      'assets/ui/Basketball_Training_Screen.png');
+    this.load.image('fairness_intro_bg_fail', 'assets/ui/Basketball_Training_Screen_Fail.png');
+    this.load.image('fairness_play_bg',       'assets/ui/Basketball_Game_Screen.png');
+    this.load.image('player_boy',             'assets/ui/Boy_Player.png');
+    this.load.image('player_girl',            'assets/ui/Girl_Player.png');
+    this.load.image('player_boy_deleted',     'assets/ui/Boy_Player_Deleted.png');
+    this.load.image('player_girl_deleted',    'assets/ui/Girl_Player_Deleted.png');
   }
 
   create() {
@@ -48,124 +49,131 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     const bodyY     = height * 0.70;
 
     this.speakerText = this.add.text(textLeftX, speakerY, '', {
-      fontSize: '26px',
-      color: '#ffd166',
-      fontFamily: 'Courier, monospace',
-      fontStyle: 'bold'
+      fontSize: '26px', color: '#ffd166',
+      fontFamily: 'Courier, monospace', fontStyle: 'bold'
     }).setOrigin(0, 0.5);
 
     this.bodyText = this.add.text(textLeftX, bodyY, '', {
-      fontSize: '26px',
-      color: '#ffffff',
-      fontFamily: 'Courier, monospace',
-      wordWrap: { width: width * 0.84 }
+      fontSize: '26px', color: '#ffffff',
+      fontFamily: 'Courier, monospace', wordWrap: { width: width * 0.84 }
     }).setOrigin(0, 0);
 
     this.hintText = this.add.text(centerX, height - 55,
-      'Press SPACE or click to continue', {
-        fontSize: '20px',
-        color: '#aaaaaa',
-        fontFamily: 'Courier, monospace',
-        align: 'center'
+      '← Back   Continue →', {
+        fontSize: '20px', color: '#aaaaaa',
+        fontFamily: 'Courier, monospace', align: 'center'
       }
     ).setOrigin(0.5);
+
+    // ── Countdown text (bottom-right) ──
+    this.countdownText = this.add.text(width - 115, height - 55, '', {
+      fontSize: '30px', color: '#ffd166', fontFamily: 'Courier, monospace'
+    }).setOrigin(1, 0.5);
 
     const { firstName } = gameState.player;
     const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
-    // ---------- DIALOGUE ----------
-
     this.introSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, time to fix one of Doom's dumbest moves!\nThis one is a real head scratcher.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, he trained a co-ed recruiting AI using mostly boy players.\nNow it thinks boys deserve more spots on the team!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, here is the thing about AI.\nIt learns from data, not from what is fair.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, unbalanced data means unfair decisions.\nBalance the dataset so everyone gets a fair shot!`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, Doom trained a co-ed recruiting AI using mostly boy players.` },
+      { speaker: 'Dr. Bot', text: `Now it thinks boys deserve more spots on the team!` },
+      { speaker: 'Dr. Bot', text: `AI learns from data, not from what is fair.\nBalance the dataset so everyone gets a fair shot!` }
     ];
 
     this.resultStepsSuccess = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✓ CORRECT!',
-        color: '#00ff88'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, your AI learned from a balanced set of boys and girls.\nThat is exactly how responsible developers think!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `When the data is fair, the decisions can be fair too.\nDoom never figured that out. You did!`
-      }
+      { speaker: 'Dr. Bot', text: '✓ CORRECT!', color: '#00ff88' },
+      { speaker: 'Dr. Bot', text: `${dev}, balanced data leads to fairer decisions.\nDoom never figured that out. You did!` }
     ];
 
     this.resultStepsFail = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✗ INCORRECT!',
-        color: '#ff4444'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, the AI is still seeing one group more than the other.\nThat is a classic Doom move.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `When one group shows up more in the data, they get picked more too.\nAnd that is not fair to anyone!`
-      }
+      { speaker: 'Dr. Bot', text: '✗ INCORRECT!', color: '#ff4444' },
+      { speaker: 'Dr. Bot', text: `${dev}, the AI still sees one group more than the other.\nWhen data is unbalanced, decisions will be too.` }
     ];
 
     this.reflectionSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, responsible AI means asking: who might be getting less of a chance?\nAlways ask that before you launch!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, before launching any system, check if your data represents everyone fairly.\nGood developers check. Doom never does.`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, before launching any system, ask yourself:\nDoes my data represent everyone fairly?` }
     ];
 
     this.phase = 'intro';
     this.currentIndex = 0;
 
-    this.input.keyboard.on('keyup-SPACE', () => this.handleAdvance());
-    this.input.on('pointerdown', () => this.handleAdvance());
+    this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.input.on('pointerdown', (pointer, targets) => {
+      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
+      if (this.phase !== 'play') this.handleAdvance();
+    });
 
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
     this.countText = this.add.text(centerX, centerY, '', {
-      fontSize: '22px',
-      color: '#ffffff',
-      fontFamily: 'Courier, monospace'
-    }).setOrigin(0.5);
-    this.countText.setVisible(false);
+      fontSize: '22px', color: '#ffffff', fontFamily: 'Courier, monospace'
+    }).setOrigin(0.5).setVisible(false);
 
     this.statusText = this.add.text(centerX, height - 120, '', {
-      fontSize: '20px',
-      color: '#ffd166',
-      fontFamily: 'Courier, monospace',
-      align: 'center',
-      wordWrap: { width: width * 0.9 }
-    }).setOrigin(0.5);
-    this.statusText.setVisible(false);
+      fontSize: '20px', color: '#ffd166',
+      fontFamily: 'Courier, monospace', align: 'center', wordWrap: { width: width * 0.9 }
+    }).setOrigin(0.5).setVisible(false);
 
     sessionLogger.logTutorialMiniGameStart('fairness');
     this.showIntroStep();
   }
 
-  // ---------- INTRO & INSTRUCTIONS ----------
+  // ─── AUTO-ADVANCE TIMER ───────────────────────────────────────────────────────
+
+  startAutoAdvanceTimer() {
+    this.clearAutoAdvanceTimer();
+    this._secondsLeft = Math.ceil(AUTO_ADVANCE_MS / 1000);
+    this.updateCountdown();
+
+    this._countdownEvent = this.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => { this._secondsLeft--; this.updateCountdown(); }
+    });
+
+    this._autoTimer = this.time.delayedCall(AUTO_ADVANCE_MS, () => this.handleAdvance());
+  }
+
+  clearAutoAdvanceTimer() {
+    if (this._autoTimer)      { this._autoTimer.remove(false);      this._autoTimer = null; }
+    if (this._countdownEvent) { this._countdownEvent.remove(false); this._countdownEvent = null; }
+    if (this.countdownText)   { this.countdownText.setText(''); }
+  }
+
+  updateCountdown() {
+    if (this.countdownText) {
+      this.countdownText.setText(this._secondsLeft > 0 ? `${this._secondsLeft}` : '');
+    }
+  }
+
+  // ─── BACK ─────────────────────────────────────────────────────────────────────
+
+  handleBack() {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex--;
+    this.refreshCurrentPhaseStep();
+  }
+
+  // Re-renders the current step without changing phase
+  refreshCurrentPhaseStep() {
+    if (this.phase === 'intro') {
+      this.showIntroStep();
+    } else if (this.phase === 'result') {
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      const step = steps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor(step.color || '#ffffff');
+      this.startAutoAdvanceTimer();
+    } else if (this.phase === 'reflection') {
+      const step = this.reflectionSteps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor('#ffffff');
+      this.startAutoAdvanceTimer();
+    }
+  }
+
+  // ─── INTRO & INSTRUCTIONS ────────────────────────────────────────────────────
 
   showIntroStep() {
     const step = this.introSteps[this.currentIndex];
@@ -173,10 +181,12 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   showInstructions() {
+    this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
@@ -186,10 +196,14 @@ export default class FairnessTutorialScene extends Phaser.Scene {
       'Click again to put them back.\n' +
       'When you think it\'s fair, press ENTER to train the AI.'
     );
-    this.hintText.setText('Press SPACE or click to begin the microgame');
+    this.hintText.setText('Begin →');
   }
 
   handleAdvance() {
+    if (this.phase === 'play') return; // handled by ENTER key only
+
+    this.clearAutoAdvanceTimer();
+
     if (this.phase === 'intro') {
       this.currentIndex++;
       if (this.currentIndex >= this.introSteps.length) {
@@ -211,6 +225,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor(step.color || '#ffffff');
+        this.startAutoAdvanceTimer();
       }
 
     } else if (this.phase === 'reflection') {
@@ -222,11 +237,12 @@ export default class FairnessTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor('#ffffff');
+        this.startAutoAdvanceTimer();
       }
     }
   }
 
-  // ---------- PLAY PHASE ----------
+  // ─── PLAY PHASE ──────────────────────────────────────────────────────────────
 
   startPlayPhase() {
     const { width, height } = this.scale;
@@ -234,12 +250,11 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     const centerY = height / 2;
 
     this.phase = 'play';
-
     this.bg.setTexture('fairness_play_bg');
-
     this.speakerText.setVisible(false);
     this.bodyText.setVisible(false);
     this.hintText.setText('');
+    this.countdownText.setText('');
 
     this.countText.setVisible(true);
     this.statusText.setVisible(true);
@@ -247,9 +262,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     this.createDatasetGrid();
     this.updateCounts();
 
-    const cols = 4;
     const rows = 3;
-    const colSpacing = 180;
     const rowSpacing = 140;
     const gridHeight = (rows - 1) * rowSpacing;
     const startY = centerY - gridHeight / 2 + 10;
@@ -287,9 +300,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
       const deletedTextureKey = type === 'boy' ? 'player_boy_deleted' : 'player_girl_deleted';
 
       const sprite = this.add.image(x, y, textureKey)
-        .setOrigin(0.5)
-        .setScale(0.5)
-        .setInteractive({ useHandCursor: true });
+        .setOrigin(0.5).setScale(0.5).setInteractive({ useHandCursor: true });
 
       const player = { sprite, type, alive: true, row, col, textureKey, deletedTextureKey };
       sprite.on('pointerdown', () => this.togglePlayer(player));
@@ -313,20 +324,13 @@ export default class FairnessTutorialScene extends Phaser.Scene {
   trainAI() {
     if (this.phase !== 'play') return;
 
-    const fairlyBalanced =
-      this.boyCount === this.girlCount &&
-      this.boyCount > 0;
-
-    this.success = fairlyBalanced;
+    this.success = this.boyCount === this.girlCount && this.boyCount > 0;
 
     if (!gameState.failures) gameState.failures = [];
     sessionLogger.logTutorialMiniGameEnd('fairness', this.success);
     gameState.failures.push({
-      microgame: 'fairness_tutorial_coed',
-      success: this.success,
-      boysRemaining: this.boyCount,
-      girlsRemaining: this.girlCount,
-      timestamp: Date.now()
+      microgame: 'fairness_tutorial_coed', success: this.success,
+      boysRemaining: this.boyCount, girlsRemaining: this.girlCount, timestamp: Date.now()
     });
 
     this.players.forEach(p => p.sprite.destroy());
@@ -335,7 +339,6 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     this.statusText.setVisible(false);
 
     this.bg.setTexture(this.success ? 'fairness_intro_bg' : 'fairness_intro_bg_fail');
-
     this.speakerText.setVisible(true);
     this.bodyText.setVisible(true);
     this.hintText.setVisible(true);
@@ -347,7 +350,8 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     this.speakerText.setText(firstStep.speaker);
     this.bodyText.setText(firstStep.text);
     this.bodyText.setColor(firstStep.color || '#ffffff');
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   startReflectionPhase() {
@@ -357,15 +361,18 @@ export default class FairnessTutorialScene extends Phaser.Scene {
     const firstStep = this.reflectionSteps[0];
     this.speakerText.setText(firstStep.speaker);
     this.bodyText.setText(firstStep.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
-  // ---------- UPDATE ----------
+  // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update() {
-    if (this.phase !== 'play') return;
-    if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-      this.trainAI();
+    if (this.phase === 'play') {
+      if (Phaser.Input.Keyboard.JustDown(this.enterKey)) this.trainAI();
+    } else {
+      if (Phaser.Input.Keyboard.JustDown(this.rightKey)) this.handleAdvance();
+      if (Phaser.Input.Keyboard.JustDown(this.leftKey))  this.handleBack();
     }
   }
 }

@@ -2,25 +2,29 @@
 import sessionLogger from '../sessionLogger.js';
 import gameState from '../gameState.js';
 
+const AUTO_ADVANCE_MS = 8000;
+
 export default class PrivacyTutorialScene extends Phaser.Scene {
   constructor() {
     super('PrivacyTutorialScene');
 
-    this.phase = 'intro'; // intro, instructions, play, result, reflection
+    this.phase = 'intro';
     this.introSteps = [];
     this.resultStepsSuccess = [];
     this.resultStepsFail = [];
     this.reflectionSteps = [];
     this.currentIndex = 0;
     this.success = false;
-
-    this.toggleLeft  = false; // Email Address
-    this.toggleRight = false; // Banking Information
+    this.toggleLeft  = false;
+    this.toggleRight = false;
     this.toggleLeftGraphics  = null;
     this.toggleRightGraphics = null;
     this.saveBtn = null;
     this.xBtn    = null;
     this.playObjects = [];
+    this._autoTimer = null;
+    this._countdownEvent = null;
+    this._secondsLeft = 0;
   }
 
   preload() {
@@ -55,102 +59,111 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
     this.bodyText = this.add.text(textLeftX, bodyY, '', {
       fontSize: '26px', color: '#ffffff',
-      fontFamily: 'Courier, monospace',
-      wordWrap: { width: width * 0.84 }
+      fontFamily: 'Courier, monospace', wordWrap: { width: width * 0.84 }
     }).setOrigin(0, 0);
 
     this.hintText = this.add.text(centerX, height - 55,
-      'Press SPACE or click to continue', {
+      '← Back   Continue →', {
         fontSize: '20px', color: '#aaaaaa',
         fontFamily: 'Courier, monospace', align: 'center'
       }
     ).setOrigin(0.5);
 
-    // ---------- DIALOGUE ----------
+    // ── Countdown text (bottom-right) ──
+    this.countdownText = this.add.text(width - 115, height - 55, '', {
+      fontSize: '30px', color: '#ffd166', fontFamily: 'Courier, monospace'
+    }).setOrigin(1, 0.5);
 
     const { firstName } = gameState.player;
     const dev = firstName ? `Developer ${firstName}` : 'Developer';
 
     this.introSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, Doom's latest project might be his sneakiest yet!\nHe is launching DoomGPT, an AI assistant that connects directly to users' devices.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, before it launches, you have to review what data it collects.\nThis is one of the most important decisions a developer makes!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, responsible developers only collect what the AI actually needs to do its job.\nAnything extra is a Dumb Way to AI.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, toggle ON what is safe to collect.\nIf neither option belongs, press X to reject them both!`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, Doom is launching DoomGPT, an AI assistant that connects directly to users' devices.` },
+      { speaker: 'Dr. Bot', text: `Before it launches, you have to approve what data it collects.` },
+      { speaker: 'Dr. Bot', text: `Responsible developers only collect what the AI actually needs.\nToggle ON what is safe. If neither option belongs, press X!` }
     ];
 
     this.resultStepsSuccess = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✓ CORRECT!',
-        color: '#00ff88'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, email address is safe to collect.\nDoomGPT needs it to create your account and nothing more.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, banking information is never safe for a free AI assistant.\nIt has absolutely no reason to touch your money!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `If the AI does not need it to do its job, it does not get collected.\nThat is what privacy looks like in action!`
-      }
+      { speaker: 'Dr. Bot', text: '✓ CORRECT!', color: '#00ff88' },
+      { speaker: 'Dr. Bot', text: `${dev}, email address is safe, it is the minimum needed to create an account.\nBanking info is never needed for a free AI assistant. Good call!` }
     ];
 
     this.resultStepsFail = [
-      {
-        speaker: 'Dr. Bot',
-        text: '✗ INCORRECT!',
-        color: '#ff4444'
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, banking information should never be collected by a free AI assistant.\nThere is no reason it needs access to your money. None!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, email address is the safe choice here.\nIt is the minimum needed to create an account and nothing more.`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `Doom counts on developers making quick decisions without thinking about who gets hurt.\nDon't let him win!`
-      }
+      { speaker: 'Dr. Bot', text: '✗ INCORRECT!', color: '#ff4444' },
+      { speaker: 'Dr. Bot', text: `${dev}, email address is safe, it is the minimum needed to create an account.\nBanking info should never be collected by a free AI assistant. Never!` }
     ];
 
     this.reflectionSteps = [
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, when an AI connects to someone's device, it is entering their personal space.\nTreat it that way!`
-      },
-      {
-        speaker: 'Dr. Bot',
-        text: `${dev}, privacy is not about what you can collect.\nIt is about what you should. Remember that every time you build something!`
-      }
+      { speaker: 'Dr. Bot', text: `${dev}, privacy is not about what you can collect.\nIt is about what you should. Only take what you need!` }
     ];
 
     this.phase = 'intro';
     this.currentIndex = 0;
 
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.input.on('pointerdown', () => {
+    this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.input.on('pointerdown', (pointer, targets) => {
+      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
       if (this.phase !== 'play') this.handleAdvance();
     });
 
     sessionLogger.logTutorialMiniGameStart('privacy');
     this.showIntroStep();
+  }
+
+  // ─── AUTO-ADVANCE TIMER ───────────────────────────────────────────────────────
+
+  startAutoAdvanceTimer() {
+    this.clearAutoAdvanceTimer();
+    this._secondsLeft = Math.ceil(AUTO_ADVANCE_MS / 1000);
+    this.updateCountdown();
+
+    this._countdownEvent = this.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => { this._secondsLeft--; this.updateCountdown(); }
+    });
+
+    this._autoTimer = this.time.delayedCall(AUTO_ADVANCE_MS, () => this.handleAdvance());
+  }
+
+  clearAutoAdvanceTimer() {
+    if (this._autoTimer)      { this._autoTimer.remove(false);      this._autoTimer = null; }
+    if (this._countdownEvent) { this._countdownEvent.remove(false); this._countdownEvent = null; }
+    if (this.countdownText)   { this.countdownText.setText(''); }
+  }
+
+  updateCountdown() {
+    if (this.countdownText) {
+      this.countdownText.setText(this._secondsLeft > 0 ? `${this._secondsLeft}` : '');
+    }
+  }
+
+  // ─── BACK ─────────────────────────────────────────────────────────────────────
+
+  handleBack() {
+    if (this.currentIndex <= 0) return;
+    this.currentIndex--;
+    this.refreshCurrentPhaseStep();
+  }
+
+  refreshCurrentPhaseStep() {
+    if (this.phase === 'intro') {
+      this.showIntroStep();
+    } else if (this.phase === 'result') {
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      const step = steps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor(step.color || '#ffffff');
+      this.startAutoAdvanceTimer();
+    } else if (this.phase === 'reflection') {
+      const step = this.reflectionSteps[this.currentIndex];
+      this.speakerText.setText(step.speaker);
+      this.bodyText.setText(step.text);
+      this.bodyText.setColor('#ffffff');
+      this.startAutoAdvanceTimer();
+    }
   }
 
   // ─── INTRO & INSTRUCTIONS ────────────────────────────────────────────────────
@@ -161,10 +174,12 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   showInstructions() {
+    this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
@@ -174,10 +189,14 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       'then press SAVE to submit.\n' +
       'If neither is safe, toggle nothing and press the X button.'
     );
-    this.hintText.setText('Press SPACE or click to begin');
+    this.hintText.setText('Begin →');
   }
 
   handleAdvance() {
+    if (this.phase === 'play') return;
+
+    this.clearAutoAdvanceTimer();
+
     if (this.phase === 'intro') {
       this.currentIndex++;
       if (this.currentIndex >= this.introSteps.length) {
@@ -199,6 +218,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor(step.color || '#ffffff');
+        this.startAutoAdvanceTimer();
       }
 
     } else if (this.phase === 'reflection') {
@@ -210,6 +230,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
         this.speakerText.setText(step.speaker);
         this.bodyText.setText(step.text);
         this.bodyText.setColor('#ffffff');
+        this.startAutoAdvanceTimer();
       }
     }
   }
@@ -219,12 +240,11 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   startPlayPhase() {
     const { width, height } = this.scale;
     this.phase = 'play';
-
     this.bg.setTexture('doomgpt_game_bg');
-
     this.speakerText.setVisible(false);
     this.bodyText.setVisible(false);
     this.hintText.setVisible(false);
+    this.countdownText.setText('');
 
     this.toggleLeft  = false;
     this.toggleRight = false;
@@ -236,7 +256,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     const toggleW    = 90;
     const toggleH    = 42;
 
-    // ── Data labels ──
     const leftLabel = this.add.text(leftBoxCX, boxCY, 'Email\nAddress', {
       fontSize: '32px', color: '#5a3e00',
       fontFamily: 'Courier, monospace', fontStyle: 'bold', align: 'center'
@@ -249,7 +268,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
     this.playObjects.push(rightLabel);
 
-    // ── Left toggle ──
     this.toggleLeftGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.toggleLeftGraphics);
     this.drawToggle(this.toggleLeftGraphics, leftBoxCX, toggleY, toggleW, toggleH, false);
@@ -259,7 +277,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     leftZone.on('pointerdown', () => this.handleToggleLeft());
     this.playObjects.push(leftZone);
 
-    // ── Right toggle ──
     this.toggleRightGraphics = this.add.graphics().setDepth(6);
     this.playObjects.push(this.toggleRightGraphics);
     this.drawToggle(this.toggleRightGraphics, rightBoxCX, toggleY, toggleW, toggleH, false);
@@ -269,12 +286,10 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     rightZone.on('pointerdown', () => this.handleToggleRight());
     this.playObjects.push(rightZone);
 
-    // ── SAVE button (grey until a toggle is ON) ──
     this.saveBtn = this.add.image(width * 0.579, height * 0.760, 'pr_btn_save_grey')
       .setOrigin(0.5).setDisplaySize(200, 150).setDepth(8);
     this.playObjects.push(this.saveBtn);
 
-    // ── X button (active until a toggle is ON) ──
     this.xBtn = this.add.image(width * 0.858, height * 0.192, 'pr_btn_x')
       .setOrigin(0.5).setDisplaySize(100, 100).setDepth(8)
       .setInteractive({ useHandCursor: true });
@@ -310,11 +325,8 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.refreshButtonState();
   }
 
-  // No toggles ON  → SAVE grey (disabled) + X red (enabled)
-  // Any toggle ON  → SAVE green (enabled) + X grey (disabled)
   refreshButtonState() {
     const anyToggled = this.toggleLeft || this.toggleRight;
-
     if (anyToggled) {
       this.saveBtn.setTexture('pr_btn_save');
       this.saveBtn.setInteractive({ useHandCursor: true });
@@ -334,15 +346,11 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
 
   // ─── SUBMIT HANDLERS ─────────────────────────────────────────────────────────
 
-  // ✅ Pass: Email Address (left) ON only
-  // ❌ Fail: Banking Information (right) ON only
-  // ❌ Fail: Both ON
   handleSubmitSave() {
     if (this.phase !== 'play') return;
     this.endRound(this.toggleLeft === true && this.toggleRight === false);
   }
 
-  // ❌ Always fails in tutorial (one option IS safe, so rejecting both is wrong)
   handleSubmitX() {
     if (this.phase !== 'play') return;
     this.endRound(false);
@@ -371,18 +379,17 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   showResultPhase() {
     this.phase = 'result';
     this.currentIndex = 0;
-
     this.bg.setTexture(this.success ? 'doomgpt_training_bg' : 'doomgpt_training_bg_fail');
-
     this.speakerText.setVisible(true);
     this.bodyText.setVisible(true);
     this.hintText.setVisible(true);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
 
     const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
     this.speakerText.setText(steps[0].speaker);
     this.bodyText.setText(steps[0].text);
     this.bodyText.setColor(steps[0].color || '#ffffff');
+    this.startAutoAdvanceTimer();
   }
 
   startReflectionPhase() {
@@ -393,16 +400,16 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     const step = this.reflectionSteps[0];
     this.speakerText.setText(step.speaker);
     this.bodyText.setText(step.text);
-    this.hintText.setText('Press SPACE or click to continue');
+    this.hintText.setText('← Back   Continue →');
+    this.startAutoAdvanceTimer();
   }
 
   // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update() {
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      if (this.phase !== 'play') this.handleAdvance();
-      // SPACE intentionally does nothing during play —
-      // student must use toggles + SAVE or X button
+    if (this.phase !== 'play') {
+      if (Phaser.Input.Keyboard.JustDown(this.rightKey)) this.handleAdvance();
+      if (Phaser.Input.Keyboard.JustDown(this.leftKey))  this.handleBack();
     }
   }
 }

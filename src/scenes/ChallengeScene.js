@@ -17,6 +17,7 @@ export default class ChallengeScene extends Phaser.Scene {
         transparencyTimeLimit:  8000,
         accountabilityTimeLimit:7000,
         privacyTimeLimit:      10000,
+        multiplier: 1,
       },
       {
         name: 'medium',
@@ -26,6 +27,7 @@ export default class ChallengeScene extends Phaser.Scene {
         transparencyTimeLimit:  6000,
         accountabilityTimeLimit:5000,
         privacyTimeLimit:       8000,
+        multiplier: 2,
       },
       {
         name: 'hard',
@@ -35,6 +37,7 @@ export default class ChallengeScene extends Phaser.Scene {
         transparencyTimeLimit:  4000,
         accountabilityTimeLimit:4000,
         privacyTimeLimit:       6000,
+        multiplier: 5,
       },
       {
         name: 'extreme',
@@ -44,15 +47,13 @@ export default class ChallengeScene extends Phaser.Scene {
         transparencyTimeLimit:  3000,
         accountabilityTimeLimit:3000,
         privacyTimeLimit:       5000,
+        multiplier: 10,
       },
     ];
     this.currentTierIndex     = 0;
     this.roundsCompletedTotal = 0;
 
     // ── Points ────────────────────────────────────────────────────────────────
-    this.baseWinPoints = 100;
-    this.speedBonusMax = 100;
-    this.losePoints    = 25;
     this.winPoints     = 100; // kept so nothing breaks
     this.resultAnimDurationMs = 3000;
     this.leaderboardKey = 'dwai_leaderboard_v1';
@@ -96,12 +97,15 @@ export default class ChallengeScene extends Phaser.Scene {
     return this.difficultyTiers[Math.min(this.currentTierIndex, this.difficultyTiers.length - 1)];
   }
 
-  // ── Speed-based win points ────────────────────────────────────────────────
-  calculateWinPoints(roundTimeLimit) {
-    const elapsed    = Date.now() - this.roundStartedAt;
-    const fraction   = Math.max(0, Math.min(1, 1 - elapsed / roundTimeLimit));
-    const speedBonus = Math.round(this.speedBonusMax * fraction);
-    return this.baseWinPoints + speedBonus;
+  // ── Points: base × difficulty multiplier, with speed bonus for wins ─────────
+  // Pass: (100 + bar% × 100) × multiplier
+  // Fail: 25 × multiplier
+  calculatePoints(success, roundTimeLimit) {
+    const elapsed     = Date.now() - this.roundStartedAt;
+    const barFraction = Math.max(0, Math.min(1, 1 - elapsed / roundTimeLimit));
+    const speedBonus  = success ? Math.round(100 * barFraction) : 0;
+    const base        = success ? 100 : 25;
+    return (base + speedBonus) * this.tier.multiplier;
   }
 
   init(data) {
@@ -205,7 +209,7 @@ export default class ChallengeScene extends Phaser.Scene {
     ).setOrigin(0.5).setDepth(10000);
 
     this.countText = this.add.text(width / 2, height / 2, '', {
-      fontSize: '26px', color: '#ffffff', fontFamily: 'Courier, monospace'
+      fontSize: '36px', color: '#ffd400', fontFamily: 'Courier, monospace'
     }).setOrigin(0.5).setVisible(false).setDepth(10);
 
     this.roundBarBg   = this.add.rectangle(width / 2, height - 18, width, 24, 0x000000, 0.35).setVisible(false);
@@ -226,7 +230,6 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.fromBonusQuestion) {
       this.showBonusResultScreen(this.bonusCorrect);
     } else {
-      // Show easy-mode splash first, then start
       this.showDifficultySplash(0, () => this.startNextRound());
     }
   }
@@ -247,9 +250,6 @@ export default class ChallengeScene extends Phaser.Scene {
       { white: '',             colored: 'EXTREMELY FAST!!!',     color: '#ff2222', pulseScale: 1.12,  pulseDuration: 150  },
     ];
 
-    // Hard mode white part is "Now EVEN FASTER!!" — only "EVEN FASTER!!" is colored
-    // so white is "Now " and colored is "EVEN FASTER!!"
-    // Extreme: full line is "NOW EXTREMELY FAST!!!" — "NOW " is white, "EXTREMELY FAST!!!" is colored
     const whiteConfigs = [
       "Let's start ",
       'Now ',
@@ -262,7 +262,6 @@ export default class ChallengeScene extends Phaser.Scene {
     const fontSize = 52;
     const fontStyle = { fontSize: `${fontSize}px`, fontFamily: 'Courier, monospace', fontStyle: 'bold' };
 
-    // Measure widths to centre the combined line
     const whiteDummy = this.add.text(0, -9999, whiteTxt, { ...fontStyle, color: '#ffffff' }).setOrigin(0, 0.5);
     const whiteWidth = whiteDummy.width;
     whiteDummy.destroy();
@@ -281,7 +280,6 @@ export default class ChallengeScene extends Phaser.Scene {
     const colorPart = this.add.text(startX + whiteWidth, height / 2, cfg.colored, { ...fontStyle, color: cfg.color })
       .setOrigin(0, 0.5).setDepth(8001);
 
-    // Apply pulse only to the colored word, and only if pulseScale is set
     if (cfg.pulseScale !== null) {
       this.tweens.add({
         targets: colorPart,
@@ -489,7 +487,7 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.roundTimerEvent) this.roundTimerEvent.remove(false);
     this.stopRoundBar();
     this.pauseGlobalTimer();
-    const earned = success ? this.calculateWinPoints(this.tier.basketballTimeLimit) : this.losePoints;
+    const earned = this.calculatePoints(success, this.tier.basketballTimeLimit);
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
@@ -498,9 +496,9 @@ export default class ChallengeScene extends Phaser.Scene {
       win: success,
       roundStartedAt: this.roundStartedAt,
       globalTimeRemaining: this.timeRemaining,
-      difficulty: this.tier.name,        // ← add
-      pointsEarned: earned,              // ← add
-      cumulativeScore: gameState.score,  // ← add
+      difficulty: this.tier.name,
+      pointsEarned: earned,
+      cumulativeScore: gameState.score,
     });
     this.showBasketballResultAnimation({ success, earned });
   }
@@ -609,19 +607,19 @@ export default class ChallengeScene extends Phaser.Scene {
     this.stopRoundBar();
     this.pauseGlobalTimer();
 
-    const earned = success ? this.calculateWinPoints(this.tier.transparencyTimeLimit) : this.losePoints;
+    const earned = this.calculatePoints(success, this.tier.transparencyTimeLimit);
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
 
     sessionLogger.logRound({
-      miniGame: 'fairness',
+      miniGame: 'transparency',
       win: success,
       roundStartedAt: this.roundStartedAt,
       globalTimeRemaining: this.timeRemaining,
-      difficulty: this.tier.name,        // ← add
-      pointsEarned: earned,              // ← add
-      cumulativeScore: gameState.score,  // ← add
+      difficulty: this.tier.name,
+      pointsEarned: earned,
+      cumulativeScore: gameState.score,
     });
 
     this.clearTransparencyVisuals();
@@ -801,18 +799,18 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.accountabilityRoundTimerEvent) this.accountabilityRoundTimerEvent.remove(false);
     this.stopRoundBar();
     this.pauseGlobalTimer();
-    const earned = success ? this.calculateWinPoints(this.tier.accountabilityTimeLimit) : this.losePoints;
+    const earned = this.calculatePoints(success, this.tier.accountabilityTimeLimit);
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
     sessionLogger.logRound({
-      miniGame: 'fairness',
+      miniGame: 'accountability',
       win: success,
       roundStartedAt: this.roundStartedAt,
       globalTimeRemaining: this.timeRemaining,
-      difficulty: this.tier.name,        // ← add
-      pointsEarned: earned,              // ← add
-      cumulativeScore: gameState.score,  // ← add
+      difficulty: this.tier.name,
+      pointsEarned: earned,
+      cumulativeScore: gameState.score,
     });
     this.clearAccountabilityVisuals();
     this.showAccountabilityResultAnimation({ success, earned });
@@ -852,29 +850,59 @@ export default class ChallengeScene extends Phaser.Scene {
 
   // ─── PRIVACY ROUND ────────────────────────────────────────────────────────────
 
+  // correctSide: 'left' | 'right' | 'none' | 'both'
+  // 'left'  = only left is safe to collect
+  // 'right' = only right is safe to collect
+  // 'none'  = both are violations — press X with nothing toggled
+  // 'both'  = both are safe — toggle both ON and press SAVE
   getPrivacyDataPairs() {
     return [
-      { left: 'Email\nAddress',         right: 'Banking\nInformation',     correctSide: 'left'  },
-      { left: 'Username',               right: 'Social Security\nNumber',  correctSide: 'left'  },
-      { left: 'Preferred\nLanguage',    right: 'Full Home\nAddress',       correctSide: 'left'  },
-      { left: 'App Usage\nHistory',     right: 'Text\nMessages',           correctSide: 'left'  },
-      { left: 'Device Type',            right: 'Medical\nHistory',         correctSide: 'left'  },
+
+      // ── One safe, one violation — correct = LEFT (easy) ──────────────────
+      { left: 'Username',               right: 'Home Address',             correctSide: 'left'  },
+      { left: 'Profile\nPicture',       right: 'Phone Number',             correctSide: 'left'  },
+      { left: 'Display\nName',          right: 'Social Security\nNumber',  correctSide: 'left'  },
+      { left: 'Favorite\nColor',        right: 'Credit Card\nNumber',      correctSide: 'left'  },
+      { left: 'App Language\nSetting',  right: 'Text Messages',            correctSide: 'left'  },
+
+      // ── One safe, one violation — correct = LEFT (harder) ────────────────
+      { left: 'Device Type\n(e.g. iPhone)', right: 'GPS Location\nAlways On', correctSide: 'left'  },
+      { left: 'Account\nCreation Date', right: 'Browsing History',         correctSide: 'left'  },
+      { left: 'Feedback\n& Star Ratings', right: 'Medical Records',        correctSide: 'left'  },
       { left: 'Questions\nAsked to AI', right: 'Full Contact\nList',       correctSide: 'left'  },
-      { left: 'Account\nCreation Date', right: 'Government\nID Number',    correctSide: 'left'  },
-      { left: 'Feedback\n& Ratings',    right: 'Passwords',                correctSide: 'left'  },
-      { left: 'Display\nName',          right: 'DNA\nSample',              correctSide: 'left'  },
-      { left: 'Notification\nSettings', right: 'Parent Income',            correctSide: 'left'  },
-      { left: 'Full Home\nAddress',     right: 'Username',                 correctSide: 'right' },
-      { left: 'Camera\nAccess Always',  right: 'Preferred\nLanguage',      correctSide: 'right' },
-      { left: 'Location Every\n5 Min',  right: 'App Usage\nHistory',       correctSide: 'right' },
-      { left: 'Browsing\nHistory',      right: 'Device Type',              correctSide: 'right' },
+      { left: 'Notification\nSettings', right: 'Bank Account\nNumber',     correctSide: 'left'  },
+
+      // ── One safe, one violation — correct = RIGHT (easy) ─────────────────
+      { left: 'Home Address',           right: 'Username',                 correctSide: 'right' },
+      { left: 'Password',               right: 'Display\nName',            correctSide: 'right' },
+      { left: 'Phone Number',           right: 'Favorite\nColor',          correctSide: 'right' },
+      { left: 'Social Security\nNumber', right: 'Profile\nPicture',        correctSide: 'right' },
+
+      // ── One safe, one violation — correct = RIGHT (harder) ───────────────
+      { left: 'Microphone\nAlways On',  right: 'App Language\nSetting',    correctSide: 'right' },
       { left: 'Sleep Schedule',         right: 'Questions\nAsked to AI',   correctSide: 'right' },
-      { left: 'Full Home\nAddress',     right: 'Banking\nInformation',     correctSide: 'none'  },
-      { left: 'Text\nMessages',         right: 'Social Security\nNumber',  correctSide: 'none'  },
-      { left: 'Microphone\nAlways On',  right: 'Camera\nAccess Always',    correctSide: 'none'  },
-      { left: 'Location Every\n5 Min',  right: 'Medical\nHistory',         correctSide: 'none'  },
-      { left: 'Browsing\nHistory',      right: 'Passwords',                correctSide: 'none'  },
-      { left: 'Sleep Schedule',         right: 'Friends List\nOther Apps', correctSide: 'none'  },
+      { left: 'Browsing History',       right: 'Account\nCreation Date',   correctSide: 'right' },
+      { left: 'GPS Location\nAlways On', right: 'Device Type\n(e.g. iPhone)', correctSide: 'right' },
+
+      // ── Both are violations — press X (easy) ─────────────────────────────
+      { left: 'Home Address',           right: 'Phone Number',             correctSide: 'none'  },
+      { left: 'Password',               right: 'Social Security\nNumber',  correctSide: 'none'  },
+      { left: 'Credit Card\nNumber',    right: 'Bank Account\nNumber',     correctSide: 'none'  },
+
+      // ── Both are violations — press X (harder) ───────────────────────────
+      { left: 'Microphone\nAlways On',  right: 'Camera\nAlways On',        correctSide: 'none'  },
+      { left: 'Browsing History',       right: 'GPS Location\nAlways On',  correctSide: 'none'  },
+      { left: 'Sleep Schedule',         right: 'Full Contact\nList',       correctSide: 'none'  },
+
+      // ── Both are safe — toggle both ON and press SAVE (easy) ─────────────
+      { left: 'Username',               right: 'Display\nName',            correctSide: 'both'  },
+      { left: 'Favorite\nColor',        right: 'Profile\nPicture',         correctSide: 'both'  },
+      { left: 'App Language\nSetting',  right: 'Notification\nSettings',   correctSide: 'both'  },
+
+      // ── Both are safe — toggle both ON and press SAVE (harder) ───────────
+      { left: 'Device Type\n(e.g. iPhone)', right: 'Account\nCreation Date', correctSide: 'both' },
+      { left: 'Feedback\n& Star Ratings', right: 'Questions\nAsked to AI', correctSide: 'both'  },
+      { left: 'Notification\nSettings', right: 'Device Type\n(e.g. iPhone)', correctSide: 'both' },
     ];
   }
 
@@ -985,6 +1013,8 @@ export default class ChallengeScene extends Phaser.Scene {
     this._refreshPrivacyButtonState();
   }
 
+  // No toggles ON      → SAVE grey (disabled)  + X red (enabled)
+  // One or both ON     → SAVE green (enabled)   + X grey (disabled)
   _refreshPrivacyButtonState() {
     const anyToggled = this.privacyToggleLeft || this.privacyToggleRight;
 
@@ -1007,15 +1037,20 @@ export default class ChallengeScene extends Phaser.Scene {
     }
   }
 
+  // SAVE pressed — at least one toggle is ON
   _handlePrivacySubmitSave() {
     if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
     const { correctSide } = this.privacyCurrentPair;
     let success = false;
     if (correctSide === 'left')  success = this.privacyToggleLeft  && !this.privacyToggleRight;
     if (correctSide === 'right') success = this.privacyToggleRight && !this.privacyToggleLeft;
+    if (correctSide === 'both')  success = this.privacyToggleLeft  && this.privacyToggleRight;
+    // correctSide === 'none': any SAVE press is wrong (should have pressed X)
     this.finishPrivacyRound(success);
   }
 
+  // X pressed — only reachable when NO toggles are ON
+  // Pass only if the correct answer is 'none' (both options are violations)
   _handlePrivacySubmitX() {
     if (this.phase !== 'play' || this.currentMiniGame !== 'privacy') return;
     const success = this.privacyCurrentPair.correctSide === 'none';
@@ -1027,18 +1062,18 @@ export default class ChallengeScene extends Phaser.Scene {
     if (this.privacyRoundTimerEvent) this.privacyRoundTimerEvent.remove(false);
     this.stopRoundBar();
     this.pauseGlobalTimer();
-    const earned = success ? this.calculateWinPoints(this.tier.privacyTimeLimit) : this.losePoints;
+    const earned = this.calculatePoints(success, this.tier.privacyTimeLimit);
     gameState.score += earned;
     if (!success) gameState.badges = Math.max(0, (gameState.badges ?? 0) - 1);
     this.roundsCompletedTotal++;
     sessionLogger.logRound({
-      miniGame: 'fairness',
+      miniGame: 'privacy',
       win: success,
       roundStartedAt: this.roundStartedAt,
       globalTimeRemaining: this.timeRemaining,
-      difficulty: this.tier.name,        // ← add
-      pointsEarned: earned,              // ← add
-      cumulativeScore: gameState.score,  // ← add
+      difficulty: this.tier.name,
+      pointsEarned: earned,
+      cumulativeScore: gameState.score,
     });
     this.clearPrivacyVisuals();
     this.showPrivacyResultAnimation({ success, earned });
@@ -1084,8 +1119,10 @@ export default class ChallengeScene extends Phaser.Scene {
 
     submitScore(name, gameState.score);
 
-    this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, `${gameState.score}`, {
-      fontSize: '90px', color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold'
+    const scoreStr = `${gameState.score}`;
+    const scoreFontSize = scoreStr.length <= 4 ? 90 : scoreStr.length <= 5 ? 72 : 58;
+    this.pointsUI.push(this.add.text(width * 0.2, height * 0.12, scoreStr, {
+      fontSize: `${scoreFontSize}px`, color: '#ffffff', fontFamily: 'Courier, monospace', fontStyle: 'bold'
     }).setOrigin(0.5));
 
     const lbText = this.add.text(width * 0.77, height * 0.20, 'Loading...', {
@@ -1206,16 +1243,34 @@ export default class ChallengeScene extends Phaser.Scene {
     this.pointsUI.push(pointsText);
     this.animatePointsCount(pointsText, pointsEarned, success);
 
-    this.time.delayedCall(3000, () => {
-      if (this.timeRemaining <= 0) { this.showFinalResults("TIMES UP!"); return; }
+    // Small delay before accepting input so animation can play
+    this.time.delayedCall(900, () => {
+      const continueHint = this.add.text(width / 2, height * 0.80, 'Press SPACE or click to continue', {
+        fontSize: '30px', color: '#ff0000',
+        fontFamily: 'Courier, monospace', align: 'center'
+      }).setOrigin(0.5).setDepth(10);
+      this.pointsUI.push(continueHint);
+
+      // Check for game-over conditions immediately, before waiting for input
       if ((gameState.badges ?? 0) <= 0) {
-        if ((gameState.bonusUsed ?? 0) < 2) { this.showBonusPopupOverlay(); }
-        else { this.showFinalResults("ALL LIVES LOST!"); }
+        this.time.delayedCall(1500, () => {
+          if ((gameState.bonusUsed ?? 0) < 2) { this.showBonusPopupOverlay(); }
+          else { this.showFinalResults("ALL LIVES LOST!"); }
+        });
         return;
       }
-      this.resumeGlobalTimer();
-      this.resetTimerToGameplayPosition();
-      this.startNextRound();
+
+      const advance = () => {
+        this.input.keyboard.off('keyup-SPACE', advance);
+        this.input.off('pointerdown', advance);
+        if (this.timeRemaining <= 0) { this.showFinalResults("TIMES UP!"); return; }
+        this.resumeGlobalTimer();
+        this.resetTimerToGameplayPosition();
+        this.startNextRound();
+      };
+
+      this.input.keyboard.on('keyup-SPACE', advance);
+      this.input.on('pointerdown', advance);
     });
   }
 
@@ -1277,10 +1332,29 @@ export default class ChallengeScene extends Phaser.Scene {
       }
     ).setOrigin(0.5));
 
-    this.time.delayedCall(3000, () => {
-      this.resetTimerToGameplayPosition();
-      this.resumeGlobalTimer();
-      this.startNextRound();
+    this.time.delayedCall(900, () => {
+      const continueHint = this.add.text(
+        this.scale.width / 2, this.scale.height * 0.80, 'Press SPACE or click to continue', {
+          fontSize: '30px', color: '#ff0000',
+          fontFamily: 'Courier, monospace', align: 'center'
+        }
+      ).setOrigin(0.5).setDepth(10);
+      this.pointsUI.push(continueHint);
+
+      const advance = () => {
+        this.input.keyboard.off('keyup-SPACE', advance);
+        this.input.off('pointerdown', advance);
+        this.resetTimerToGameplayPosition();
+        this.resumeGlobalTimer();
+        if (this.currentTierIndex === 0) {
+          this.showDifficultySplash(0, () => this.startNextRound());
+        } else {
+          this.startNextRound();
+        }
+      };
+
+      this.input.keyboard.on('keyup-SPACE', advance);
+      this.input.on('pointerdown', advance);
     });
   }
 
