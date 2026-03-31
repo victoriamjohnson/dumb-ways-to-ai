@@ -47,6 +47,16 @@ export default class ChallengeScene extends Phaser.Scene {
         transparencyTimeLimit:  3000,
         accountabilityTimeLimit:3000,
         privacyTimeLimit:       5000,
+        multiplier: 8,
+      },
+      {
+        name: 'impossible',
+        labelSpeed:               1200,
+        acSpacesMin: 30, acSpacesMax: 45,
+        basketballTimeLimit:    4000,
+        transparencyTimeLimit:  2000,
+        accountabilityTimeLimit:2000,
+        privacyTimeLimit:       4000,
         multiplier: 10,
       },
     ];
@@ -248,6 +258,7 @@ export default class ChallengeScene extends Phaser.Scene {
       { white: 'Now ',         colored: 'FASTER!',              color: '#ffd400', pulseScale: 1.04,  pulseDuration: 600  },
       { white: 'Now ',         colored: 'EVEN FASTER!!',        color: '#ff8800', pulseScale: 1.08,  pulseDuration: 350  },
       { white: '',             colored: 'EXTREMELY FAST!!!',     color: '#ff2222', pulseScale: 1.12,  pulseDuration: 150  },
+      { white: '',             colored: 'IMPOSSIBLE!!!',         color: '#ff00ff', pulseScale: 1.18, pulseDuration: 80 },
     ];
 
     const whiteConfigs = [
@@ -255,6 +266,7 @@ export default class ChallengeScene extends Phaser.Scene {
       'Now ',
       'Now ',
       'NOW ',
+      '',
     ];
 
     const cfg      = configs[Math.min(tierIndex, configs.length - 1)];
@@ -327,9 +339,9 @@ export default class ChallengeScene extends Phaser.Scene {
   startNextRound() {
     if (this.timeRemaining <= 0 || this.phase === 'ended') return;
 
-    // Check if a full pass of 5 rounds just completed and difficulty should increase
+    // Check if a full pass of 7 rounds just completed and difficulty should increase
     const newTierIndex = Math.min(
-      Math.floor(this.roundsCompletedTotal / 5),
+      Math.floor(this.roundsCompletedTotal / 7),
       this.difficultyTiers.length - 1
     );
 
