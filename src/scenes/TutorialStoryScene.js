@@ -66,7 +66,7 @@ export default class TutorialStoryScene extends Phaser.Scene {
     if (this.outroMode) {
       this.dialogue = [
         { speaker: 'Dr. Bot', text: `${dev}, tutorial complete!\nNow let's see how you do under pressure.` },
-        { speaker: 'Dr. Bot', text: `The city's AI systems go live in 2 minutes.\nNo explanations. Just you and the clock.` },
+        { speaker: 'Dr. Bot', text: `The city's AI systems are going live.\nNo explanations. Just you and the clock.` },
         { speaker: 'Dr. Bot', text: `Head to Challenge Mode when you are ready.\nGood luck!` }
       ];
     } else {

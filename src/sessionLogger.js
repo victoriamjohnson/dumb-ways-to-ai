@@ -119,7 +119,7 @@ function logRound({ miniGame, win, roundStartedAt, globalTimeRemaining, difficul
   const durationMs  = Date.now() - roundStartedAt;
 
   // Track the highest difficulty tier reached this session
-  const tierOrder = ['easy', 'medium', 'hard', 'extreme'];
+  const tierOrder = ['easy', 'medium', 'hard', 'extreme', 'impossible'];
   const currentHighest = _session.challenge.highestDifficultyReached ?? 'easy';
   if (tierOrder.indexOf(difficulty) > tierOrder.indexOf(currentHighest)) {
     _session.challenge.highestDifficultyReached = difficulty;

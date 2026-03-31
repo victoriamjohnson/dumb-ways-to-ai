@@ -7,12 +7,12 @@ export default class ChallengeScene extends Phaser.Scene {
   constructor() {
     super('ChallengeScene');
 
-    // ── Difficulty tiers — advance every 5 rounds ─────────────────────────────
+    // ── Difficulty tiers — advance every 4 rounds ─────────────────────────────
     this.difficultyTiers = [
       {
         name: 'easy',
         labelSpeed:               550,
-        acSpacesMin: 10, acSpacesMax: 15,
+        acSpacesMin: 8, acSpacesMax: 10,
         basketballTimeLimit:   10000,
         transparencyTimeLimit:  8000,
         accountabilityTimeLimit:7000,
@@ -22,7 +22,7 @@ export default class ChallengeScene extends Phaser.Scene {
       {
         name: 'medium',
         labelSpeed:               750,
-        acSpacesMin: 15, acSpacesMax: 20,
+        acSpacesMin: 10, acSpacesMax: 15,
         basketballTimeLimit:    8000,
         transparencyTimeLimit:  6000,
         accountabilityTimeLimit:5000,
@@ -32,7 +32,7 @@ export default class ChallengeScene extends Phaser.Scene {
       {
         name: 'hard',
         labelSpeed:               950,
-        acSpacesMin: 20, acSpacesMax: 25,
+        acSpacesMin: 15, acSpacesMax: 18,
         basketballTimeLimit:    6000,
         transparencyTimeLimit:  4000,
         accountabilityTimeLimit:4000,
@@ -42,7 +42,7 @@ export default class ChallengeScene extends Phaser.Scene {
       {
         name: 'extreme',
         labelSpeed:               1050,
-        acSpacesMin: 25, acSpacesMax: 35,
+        acSpacesMin: 18, acSpacesMax: 20,
         basketballTimeLimit:    5000,
         transparencyTimeLimit:  3000,
         accountabilityTimeLimit:3000,
@@ -52,7 +52,7 @@ export default class ChallengeScene extends Phaser.Scene {
       {
         name: 'impossible',
         labelSpeed:               1200,
-        acSpacesMin: 30, acSpacesMax: 45,
+        acSpacesMin: 20, acSpacesMax: 25,
         basketballTimeLimit:    4000,
         transparencyTimeLimit:  2000,
         accountabilityTimeLimit:2000,
@@ -123,7 +123,7 @@ export default class ChallengeScene extends Phaser.Scene {
     this.fromBonusQuestion = !!data?.fromBonusQuestion;
     this.bonusCorrect = !!data?.bonusCorrect;
     if (this.resumeRun) {
-      this.timeRemaining        = data.timeRemaining        ?? this.timeRemaining ?? 120;
+      this.timeRemaining        = data.timeRemaining        ?? this.timeRemaining ?? 60;
       gameState.score           = data.score                ?? gameState.score    ?? 0;
       gameState.badges          = data.badges               ?? gameState.badges   ?? 1;
       this.currentTierIndex     = data.currentTierIndex     ?? 0;
@@ -194,7 +194,7 @@ export default class ChallengeScene extends Phaser.Scene {
       gameState.bonusUsed = 0;
       gameState.usedBonusQuestions = [];
       if (!gameState.failures) gameState.failures = [];
-      this.timeRemaining        = 120;
+      this.timeRemaining        = 60;
       this.currentTierIndex     = 0;
       this.roundsCompletedTotal = 0;
       this._firstPassPool = [];
@@ -339,9 +339,9 @@ export default class ChallengeScene extends Phaser.Scene {
   startNextRound() {
     if (this.timeRemaining <= 0 || this.phase === 'ended') return;
 
-    // Check if a full pass of 7 rounds just completed and difficulty should increase
+    // Check if a full pass of 4 rounds just completed and difficulty should increase
     const newTierIndex = Math.min(
-      Math.floor(this.roundsCompletedTotal / 7),
+      Math.floor(this.roundsCompletedTotal / 4),
       this.difficultyTiers.length - 1
     );
 
