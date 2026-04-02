@@ -103,10 +103,6 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
     this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-    this.input.on('pointerdown', (pointer, targets) => {
-      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
-      if (this.phase !== 'play') this.handleAdvance();
-    });
 
     sessionLogger.logTutorialMiniGameStart('privacy');
     this.showIntroStep();
@@ -142,9 +138,27 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   // ─── BACK ─────────────────────────────────────────────────────────────────────
 
   handleBack() {
-    if (this.currentIndex <= 0) return;
-    this.currentIndex--;
-    this.refreshCurrentPhaseStep();
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.refreshCurrentPhaseStep();
+      return;
+    }
+
+    if (this.phase === 'reflection') {
+      this.phase = 'result';
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      this.currentIndex = steps.length - 1;
+      this.refreshCurrentPhaseStep();
+    } else if (this.phase === 'instructions') {
+      // Go back to the last intro step
+      this.phase = 'intro';
+      this.currentIndex = this.introSteps.length - 1;
+      this.showIntroStep();
+    } else if (this.phase === 'result' && this.currentIndex === 0) {
+      return;
+    } else if (this.phase === 'intro' && this.currentIndex === 0) {
+      return;
+    }
   }
 
   refreshCurrentPhaseStep() {
@@ -181,6 +195,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
   showInstructions() {
     this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
+    this.currentIndex = 0;  // ← add this
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
@@ -189,7 +204,7 @@ export default class PrivacyTutorialScene extends Phaser.Scene {
       'then press SAVE to submit.\n' +
       'If neither is safe, toggle nothing and press the X button.'
     );
-    this.hintText.setText('Begin →');
+    this.hintText.setText('← Back   Begin →');
   }
 
   handleAdvance() {

@@ -98,10 +98,6 @@ export default class FairnessTutorialScene extends Phaser.Scene {
 
     this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
     this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-    this.input.on('pointerdown', (pointer, targets) => {
-      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
-      if (this.phase !== 'play') this.handleAdvance();
-    });
 
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
@@ -148,9 +144,27 @@ export default class FairnessTutorialScene extends Phaser.Scene {
   // ─── BACK ─────────────────────────────────────────────────────────────────────
 
   handleBack() {
-    if (this.currentIndex <= 0) return;
-    this.currentIndex--;
-    this.refreshCurrentPhaseStep();
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.refreshCurrentPhaseStep();
+      return;
+    }
+
+    if (this.phase === 'reflection') {
+      this.phase = 'result';
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      this.currentIndex = steps.length - 1;
+      this.refreshCurrentPhaseStep();
+    } else if (this.phase === 'instructions') {
+      // Go back to the last intro step
+      this.phase = 'intro';
+      this.currentIndex = this.introSteps.length - 1;
+      this.showIntroStep();
+    } else if (this.phase === 'result' && this.currentIndex === 0) {
+      return;
+    } else if (this.phase === 'intro' && this.currentIndex === 0) {
+      return;
+    }
   }
 
   // Re-renders the current step without changing phase
@@ -188,6 +202,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
   showInstructions() {
     this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
+    this.currentIndex = 0;  // ← add this
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
@@ -196,7 +211,7 @@ export default class FairnessTutorialScene extends Phaser.Scene {
       'Click again to put them back.\n' +
       'When you think it\'s fair, press ENTER to train the AI.'
     );
-    this.hintText.setText('Begin →');
+    this.hintText.setText('← Back   Begin →');
   }
 
   handleAdvance() {

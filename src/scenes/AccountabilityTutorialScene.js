@@ -99,10 +99,6 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.leftKey  = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
     this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-    this.input.on('pointerdown', (pointer, targets) => {
-      if (targets.length > 0) return; // ignore clicks on interactive objects (back button)
-      if (this.phase !== 'play') this.handleAdvance();
-    });
 
     sessionLogger.logTutorialMiniGameStart('accountability');
     this.showIntroStep();
@@ -138,9 +134,27 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
   // ─── BACK ─────────────────────────────────────────────────────────────────────
 
   handleBack() {
-    if (this.currentIndex <= 0) return;
-    this.currentIndex--;
-    this.refreshCurrentPhaseStep();
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.refreshCurrentPhaseStep();
+      return;
+    }
+
+    if (this.phase === 'reflection') {
+      this.phase = 'result';
+      const steps = this.success ? this.resultStepsSuccess : this.resultStepsFail;
+      this.currentIndex = steps.length - 1;
+      this.refreshCurrentPhaseStep();
+    } else if (this.phase === 'instructions') {
+      // Go back to the last intro step
+      this.phase = 'intro';
+      this.currentIndex = this.introSteps.length - 1;
+      this.showIntroStep();
+    } else if (this.phase === 'result' && this.currentIndex === 0) {
+      return;
+    } else if (this.phase === 'intro' && this.currentIndex === 0) {
+      return;
+    }
   }
 
   refreshCurrentPhaseStep() {
@@ -177,6 +191,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
   showInstructions() {
     this.clearAutoAdvanceTimer();
     this.phase = 'instructions';
+    this.currentIndex = 0;  // ← add this
     this.bodyText.setColor('#ffffff');
     this.speakerText.setText('Dr. Bot');
     this.bodyText.setText(
@@ -184,7 +199,7 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
       'Mash SPACE as fast as you can to fill the override bar.\n' +
       'Fill it completely to push the correction patch!'
     );
-    this.hintText.setText('Begin →');
+    this.hintText.setText('← Back   Begin →');
   }
 
   handleAdvance() {
@@ -339,11 +354,9 @@ export default class AccountabilityTutorialScene extends Phaser.Scene {
   // ─── UPDATE ──────────────────────────────────────────────────────────────────
 
   update() {
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      if (this.phase === 'play') this.handleSpaceMash();
-      else this.handleAdvance();
-    }
-    if (this.phase !== 'play') {
+    if (this.phase === 'play') {
+      if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) this.handleSpaceMash();
+    } else {
       if (Phaser.Input.Keyboard.JustDown(this.rightKey)) this.handleAdvance();
       if (Phaser.Input.Keyboard.JustDown(this.leftKey))  this.handleBack();
     }
