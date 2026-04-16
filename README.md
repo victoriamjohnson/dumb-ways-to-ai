@@ -3,7 +3,7 @@
 > *"Build AI. Don't break society."*
 
 An educational browser-based game teaching 8th graders about the principles 
-of Responsible AI through fast-paced, WarioWare-style microgames.
+of Responsible AI through fast-paced, Dumb Ways to Die-style microgames.
 
 🎮 **Play here:** https://victoriamjohnson.github.io/dumb-ways-to-ai/
 
